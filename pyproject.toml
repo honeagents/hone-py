@@ -1,0 +1,136 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hone-sdk"
+version = "0.1.0"
+description = "Hone SDK - Automatic LLM evaluation and prompt optimization. Track calls, auto-detect agents, and improve prompts from production failures."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [
+    { name = "Hone Team", email = "team@hone.ai" },
+]
+maintainers = [
+    { name = "Hone Team", email = "team@hone.ai" },
+]
+keywords = [
+    "llm",
+    "ai",
+    "evaluation",
+    "tracing",
+    "monitoring",
+    "prompt-engineering",
+    "langchain",
+    "openai",
+    "anthropic",
+    "claude",
+    "gpt",
+    "testing",
+    "observability",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Testing",
+    "Topic :: System :: Monitoring",
+    "Typing :: Typed",
+    "Framework :: AsyncIO",
+]
+
+dependencies = [
+    "httpx>=0.24.0",
+]
+
+[project.optional-dependencies]
+# Development dependencies
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+# Alternative HTTP client
+requests = [
+    "requests>=2.28.0",
+]
+# LLM provider integrations
+openai = [
+    "openai>=1.0.0",
+]
+anthropic = [
+    "anthropic>=0.18.0",
+]
+litellm = [
+    "litellm>=1.0.0",
+]
+# All LLM providers
+all = [
+    "openai>=1.0.0",
+    "anthropic>=0.18.0",
+    "litellm>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://hone.ai"
+Documentation = "https://docs.hone.ai"
+Repository = "https://github.com/hone/hone-sdk"
+Issues = "https://github.com/hone/hone-sdk/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["hone"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+addopts = "-v --tb=short"
+
+[tool.black]
+line-length = 88
+target-version = ["py39", "py310", "py311", "py312"]
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+    | \.venv
+    | build
+    | dist
+)/
+'''
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+]
+ignore = [
+    "E501",  # line too long (handled by black)
+]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
