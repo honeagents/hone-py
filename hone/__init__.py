@@ -1,73 +1,84 @@
 """
-Hone Python SDK - Track and evaluate your LLM calls.
+Hone SDK - AI Experience Engineering Platform.
 
-Portions of this code adapted from LangSmith SDK
-Copyright (c) 2023 LangChain
-Licensed under MIT License
-https://github.com/langchain-ai/langsmith-sdk
+Hone is an SDK-first evaluation platform that automatically tracks LLM calls,
+generates test cases from production failures, and helps improve prompts.
 
-Example Usage:
+This SDK wraps the LangSmith SDK to redirect all data to Hone's backend
+while maintaining full compatibility with LangSmith's battle-tested APIs.
+
+Quick Start:
     ```python
-    from hone import Hone
-    from hone.wrappers import wrap_openai
-    from openai import OpenAI
+    import os
+    from hone import traceable, Client
 
-    hone = Hone(api_key="hone_xxx", project_id="my-project")
+    # Set your API key
+    os.environ["HONE_API_KEY"] = "hone_xxx"
 
-    # Option 1: Use the @hone.track() decorator
-    @hone.track()
-    def my_llm_call(message: str):
-        return openai.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": message}]
-        )
+    # Track functions with the decorator
+    @traceable
+    def my_agent(query: str) -> str:
+        # Your LLM call here
+        return "response"
 
-    # Option 2: Use automatic wrappers for zero-code instrumentation
-    client = wrap_openai(OpenAI(), hone_client=hone)
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": "Hello!"}]
-    )
-
-    hone.shutdown()
+    # Or use the client directly
+    client = Client()
     ```
+
+Environment Variables:
+    HONE_API_KEY: Your Hone API key
+    HONE_ENDPOINT: API endpoint (default: https://api.honeagents.ai)
+    HONE_PROJECT: Project name for organizing traces
+    HONE_TRACING: Enable/disable tracing ("true" or "false")
+
+Migration from LangSmith:
+    Simply change your imports from `langsmith` to `hone`.
+    LANGSMITH_* environment variables are supported for backward compatibility.
 """
-
-from hone.client import Hone
-from hone.models import TrackedCall
-from hone.exceptions import (
-    HoneError,
-    HoneConnectionError,
-    HoneValidationError,
-    HoneAuthenticationError,
-    HoneRateLimitError,
-)
-
-# Import wrappers for easy access
-from hone.wrappers import (
-    wrap_openai,
-    wrap_anthropic,
-    wrap_gemini,
-    wrap_litellm,
-)
 
 __version__ = "0.1.0"
 
+# Apply patches FIRST before any other imports
+# This ensures all subsequent langsmith imports use Hone configuration
+from hone import _patch  # noqa: F401
+
+# Re-export client classes
+from hone.client import Client, AsyncClient
+
+# Re-export tracing decorators and utilities
+from hone.run_helpers import (
+    traceable,
+    trace,
+    get_current_run_tree,
+    get_tracing_context,
+    RunTree,
+)
+
+# Re-export commonly used schemas
+from hone.schemas import (
+    Run,
+    Feedback,
+    Dataset,
+    Example,
+    EvaluationResult,
+)
+
 __all__ = [
-    # Core client
-    "Hone",
-    "TrackedCall",
-    # Exceptions
-    "HoneError",
-    "HoneConnectionError",
-    "HoneValidationError",
-    "HoneAuthenticationError",
-    "HoneRateLimitError",
-    # Wrappers
-    "wrap_openai",
-    "wrap_anthropic",
-    "wrap_gemini",
-    "wrap_litellm",
     # Version
     "__version__",
+    # Clients
+    "Client",
+    "AsyncClient",
+    # Tracing
+    "traceable",
+    "trace",
+    "get_current_run_tree",
+    "get_tracing_context",
+    "RunTree",
+    # Schemas
+    "Run",
+    "Feedback",
+    "Dataset",
+    "Example",
+    "EvaluationResult",
 ]

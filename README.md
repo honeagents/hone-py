@@ -1,306 +1,260 @@
-# AIX Python SDK
+# Hone SDK
 
-Track and evaluate your LLM calls with the AIX SDK.
+**AI Experience Engineering Platform** - Track, evaluate, and improve your LLM applications.
+
+Hone is an SDK-first evaluation platform that automatically tracks LLM calls, generates test cases from production failures, and helps non-technical users improve prompts.
 
 ## Installation
 
 ```bash
-pip install aix-sdk
+pip install hone-sdk
 ```
 
-For development:
+With optional provider integrations:
 
 ```bash
-pip install aix-sdk[dev]
+# OpenAI support
+pip install hone-sdk[openai]
+
+# Anthropic support
+pip install hone-sdk[anthropic]
+
+# All integrations
+pip install hone-sdk[all]
 ```
 
 ## Quick Start
 
-```python
-from aix import AIX
+### 1. Set your API key
 
-# Initialize the client
-aix = AIX(
-    api_key="aix_your_api_key",
-    project_id="my-project"
-)
-
-# Track your LLM calls with the @hone.track() decorator
-@hone.track()
-def my_llm_function(message: str):
-    return openai.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": message}]
-    )
-
-# Use your function normally - tracking happens automatically
-result = my_llm_function("Hello, AI!")
-
-# Don't forget to shutdown when done
-aix.shutdown()
+```bash
+export HONE_API_KEY=hone_xxx
 ```
 
-## Automatic Provider Wrappers
-
-The easiest way to track all your LLM calls is using automatic wrappers. These require zero code changes to your existing logic.
-
-### OpenAI
+### 2. Track your LLM calls
 
 ```python
-from openai import OpenAI
-from aix import AIX, wrap_openai
+from hone import traceable
 
-aix = AIX(api_key="aix_xxx", project_id="my-project")
-client = wrap_openai(OpenAI(), aix_client=aix)
+@traceable
+def my_agent(query: str) -> str:
+    # Your LLM call here
+    response = openai.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": query}]
+    )
+    return response.choices[0].message.content
 
-# All calls are now automatically tracked
+# Every call is now tracked automatically
+result = my_agent("What is the capital of France?")
+```
+
+### 3. View your traces
+
+Visit [https://honeagents.ai](https://honeagents.ai) to see your traced calls, detected agents, and evaluation results.
+
+## Features
+
+### Automatic Tracing
+
+The `@traceable` decorator captures:
+- Function inputs and outputs
+- Execution time and latency
+- Token usage and costs
+- Nested call hierarchies
+- Errors and exceptions
+
+```python
+from hone import traceable
+
+@traceable(name="customer-support-agent")
+def support_agent(user_message: str) -> str:
+    # Nested calls are automatically traced
+    context = retrieve_context(user_message)
+    response = generate_response(user_message, context)
+    return response
+
+@traceable
+def retrieve_context(query: str) -> str:
+    # RAG retrieval
+    return vector_db.search(query)
+
+@traceable
+def generate_response(query: str, context: str) -> str:
+    # LLM generation
+    return llm.generate(query, context)
+```
+
+### Auto-Instrumentation
+
+Wrap your LLM clients for automatic tracing without decorators:
+
+```python
+from hone.wrappers.openai import wrap_openai
+import openai
+
+# Wrap the OpenAI client
+client = wrap_openai(openai.OpenAI())
+
+# All calls are now traced automatically
 response = client.chat.completions.create(
     model="gpt-4",
     messages=[{"role": "user", "content": "Hello!"}]
 )
-
-# Streaming is also supported
-for chunk in client.chat.completions.create(
-    model="gpt-4",
-    messages=[{"role": "user", "content": "Tell me a story"}],
-    stream=True
-):
-    print(chunk.choices[0].delta.content or "", end="")
 ```
 
-### Anthropic
+### Manual Client Usage
+
+For more control, use the Client directly:
 
 ```python
-from anthropic import Anthropic
-from aix import AIX, wrap_anthropic
+from hone import Client
 
-aix = AIX(api_key="aix_xxx", project_id="my-project")
-client = wrap_anthropic(Anthropic(), aix_client=aix)
+client = Client()
 
-response = client.messages.create(
-    model="claude-3-5-sonnet-latest",
-    max_tokens=1000,
-    messages=[{"role": "user", "content": "Hello!"}]
+# Create a run manually
+run = client.create_run(
+    name="my-pipeline",
+    run_type="chain",
+    inputs={"query": "Hello"},
 )
 
-# Streaming with context manager
-with client.messages.stream(
-    model="claude-3-5-sonnet-latest",
-    max_tokens=1000,
-    messages=[{"role": "user", "content": "Hello!"}]
-) as stream:
-    for text in stream.text_stream:
-        print(text, end="", flush=True)
+# ... do work ...
+
+# End the run
+client.update_run(
+    run.id,
+    outputs={"response": "Hi there!"},
+    end_time=datetime.now(),
+)
 ```
 
-### Google Gemini
+### Feedback & Evaluation
+
+Record evaluation scores for your runs:
 
 ```python
-from google import genai
-from aix import AIX, wrap_gemini
+from hone import Client
 
-aix = AIX(api_key="aix_xxx", project_id="my-project")
-client = wrap_gemini(genai.Client(api_key="..."), aix_client=aix)
+client = Client()
 
-response = client.models.generate_content(
-    model="gemini-2.5-flash",
-    contents="Hello!"
-)
-print(response.text)
-```
-
-### LiteLLM (Multi-Provider)
-
-LiteLLM provides a unified interface to 100+ LLM providers. Wrapping LiteLLM tracks calls to all of them.
-
-```python
-import litellm
-from aix import AIX, wrap_litellm
-
-aix = AIX(api_key="aix_xxx", project_id="my-project")
-wrap_litellm(aix)  # Patches litellm globally
-
-# Now all litellm calls are tracked
-response = litellm.completion(
-    model="gpt-4",
-    messages=[{"role": "user", "content": "Hello!"}]
-)
-
-# Works with any provider
-response = litellm.completion(
-    model="anthropic/claude-3-5-sonnet-latest",
-    messages=[{"role": "user", "content": "Hello!"}]
-)
-
-response = litellm.completion(
-    model="bedrock/anthropic.claude-v2",
-    messages=[{"role": "user", "content": "Hello!"}]
+# Record feedback
+client.create_feedback(
+    run_id="...",
+    key="user_satisfaction",
+    score=0.9,
+    comment="User seemed happy with the response",
 )
 ```
 
-## Features
+## Environment Variables
 
-- **Zero-latency tracking**: Background thread handles uploads without blocking your code
-- **Automatic metadata extraction**: Captures model, tokens, and cost from OpenAI/Anthropic responses
-- **Async support**: Works with both sync and async functions
-- **Error tracking**: Captures and tracks exceptions
-- **Batch uploads**: Efficiently batches calls to minimize API requests
-- **Retry logic**: Automatic retries with exponential backoff
-- **Automatic wrappers**: Zero-code instrumentation for OpenAI, Anthropic, Gemini, and LiteLLM
-- **Streaming support**: Full support for streaming responses
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `HONE_API_KEY` | Your Hone API key | Required |
+| `HONE_ENDPOINT` | API endpoint URL | `https://api.honeagents.ai` |
+| `HONE_PROJECT` | Project name | `default` |
+| `HONE_TRACING` | Enable tracing | `true` |
 
-## Configuration
+### Migration from LangSmith
 
-```python
-aix = AIX(
-    api_key="aix_xxx",           # Required: Your AIX API key
-    project_id="my-project",     # Required: Project identifier
-    api_url="https://api.hone.ai", # Optional: API endpoint (default: localhost)
-    batch_size=100,              # Optional: Calls per batch (default: 100)
-    flush_interval=1.0,          # Optional: Seconds between flushes (default: 1.0)
-    max_retries=3,               # Optional: Retry attempts (default: 3)
-)
+Hone SDK is fully compatible with LangSmith environment variables for easy migration:
+
+```bash
+# These still work!
+export LANGSMITH_API_KEY=ls_xxx
+export LANGSMITH_PROJECT=my-project
 ```
+
+Priority order: `HONE_*` > `LANGSMITH_*` > `LANGCHAIN_*`
 
 ## Advanced Usage
 
-### Custom Names and Metadata
+### Async Support
 
 ```python
-@hone.track(
-    name="customer-support-bot",
-    metadata={"version": "1.0", "environment": "production"}
+from hone import AsyncClient, traceable
+import asyncio
+
+@traceable
+async def async_agent(query: str) -> str:
+    # Async functions work seamlessly
+    response = await async_llm_call(query)
+    return response
+
+async def main():
+    client = AsyncClient()
+    result = await async_agent("Hello!")
+```
+
+### Custom Metadata
+
+```python
+@traceable(
+    name="my-agent",
+    metadata={"version": "1.0", "environment": "production"},
+    tags=["customer-support", "production"],
 )
-def support_bot(query: str):
-    # Your LLM logic here
-    pass
+def my_agent(query: str) -> str:
+    return llm.generate(query)
 ```
 
-### Async Functions
+### Run Trees (Manual Hierarchy)
 
 ```python
-@hone.track()
-async def async_llm_call(prompt: str):
-    return await openai.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": prompt}]
-    )
-```
+from hone import RunTree
 
-### Context Manager
+with RunTree(name="parent-operation") as parent:
+    # Child operations
+    with parent.child(name="child-1"):
+        do_something()
 
-```python
-with AIX(api_key="aix_xxx", project_id="my-project") as aix:
-    @hone.track()
-    def my_function():
-        pass
-
-    my_function()
-# Automatically cleaned up when exiting context
-```
-
-### Manual Flush
-
-```python
-# Force upload of all pending calls
-aix.flush()
-
-# With timeout
-aix.flush(timeout=10.0)
+    with parent.child(name="child-2"):
+        do_something_else()
 ```
 
 ## API Reference
 
-### `AIX` Class
+### `@traceable`
 
-Main client class for tracking LLM calls.
-
-#### Methods
-
-- `track(name=None, metadata=None)` - Decorator to track function calls
-- `flush(timeout=5.0)` - Force upload of pending calls
-- `shutdown(timeout=5.0)` - Gracefully shutdown the client
-
-### `TrackedCall` Model
-
-Data model for tracked calls with the following fields:
-
-- `function_name: str` - Name of the tracked function
-- `input: Dict[str, Any]` - Input arguments
-- `output: Any` - Function return value
-- `duration_ms: int` - Execution time in milliseconds
-- `started_at: datetime` - Start timestamp
-- `metadata: Dict[str, Any]` - Custom metadata
-- `model: str` - LLM model used (auto-extracted)
-- `tokens_used: int` - Token count (auto-extracted)
-- `error: str` - Error message if exception occurred
-
-## Agent Framework Integrations
-
-### OpenAI Agents SDK
+Decorator to automatically trace function calls.
 
 ```python
-from agents import Agent, Runner, function_tool, set_trace_processors
-from aix import AIX
-from aix.integrations import OpenAIAgentsTracingProcessor
+@traceable(
+    name: str = None,           # Custom name (default: function name)
+    run_type: str = "chain",    # Run type: chain, llm, tool, etc.
+    metadata: dict = None,      # Additional metadata
+    tags: list[str] = None,     # Categorization tags
+    client: Client = None,      # Custom client instance
+    project_name: str = None,   # Override project name
+)
+```
 
-aix = AIX(api_key="aix_xxx", project_id="my-project")
-set_trace_processors([OpenAIAgentsTracingProcessor(aix_client=aix)])
+### `Client`
 
-@function_tool
-def get_weather(city: str) -> str:
-    return f"The weather in {city} is sunny"
+Main client for Hone API.
 
-agent = Agent(
-    name="Weather Agent",
-    instructions="Help users with weather information",
-    model="o3-mini",
-    tools=[get_weather],
+```python
+client = Client(
+    api_url: str = None,    # API endpoint
+    api_key: str = None,    # API key
+    **kwargs                # Additional LangSmith client options
 )
 
-result = await Runner.run(agent, "What's the weather in San Francisco?")
-```
-
-### Claude Agent SDK
-
-```python
-from aix import AIX
-from aix.integrations import configure_claude_agent_sdk
-
-aix = AIX(api_key="aix_xxx", project_id="my-project")
-configure_claude_agent_sdk(aix)
-
-# Now use claude_agent_sdk as normal - tracing is automatic
-from claude_agent_sdk import ClaudeSDKClient
-
-client = ClaudeSDKClient()
-async for event in client.conversation_stream(messages=[...]):
-    print(event)
-```
-
-## Development
-
-### Setup
-
-```bash
-cd sdk/python
-pip install -e ".[dev]"
-```
-
-### Run Tests
-
-```bash
-pytest tests/
-```
-
-### Run with Coverage
-
-```bash
-pytest tests/ --cov=aix --cov-report=html
+# Methods
+client.create_run(...)      # Create a new run
+client.update_run(...)      # Update/end a run
+client.create_feedback(...) # Record evaluation feedback
+client.create_dataset(...)  # Create a test dataset
+client.create_example(...)  # Add example to dataset
 ```
 
 ## License
 
-MIT License - See LICENSE file for details.
+MIT License - see LICENSE file for details.
 
-Portions of this code adapted from [LangSmith SDK](https://github.com/langchain-ai/langsmith-sdk) (MIT License).
+## Support
+
+- Documentation: [https://docs.honeagents.ai](https://docs.honeagents.ai)
+- Issues: [https://github.com/stone-pebble/hone-sdk/issues](https://github.com/stone-pebble/hone-sdk/issues)
+- Email: support@honeagents.ai
