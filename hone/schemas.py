@@ -29,8 +29,8 @@ from langsmith.schemas import (
     DataType,
 )
 
-# Evaluation schemas
-from langsmith.schemas import (
+# Evaluation schemas (from evaluation module)
+from langsmith.evaluation import (
     EvaluationResult,
 )
 
