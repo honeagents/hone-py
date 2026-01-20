@@ -14,26 +14,40 @@ class HoneConfig(TypedDict, total=False):
     timeout: int  # Optional (milliseconds)
 
 
-class GetPromptOptions(TypedDict, total=False):
+class Hyperparameters(TypedDict, total=False):
     """
-    Options for fetching and evaluating a prompt.
+    Hyperparameters for LLM configuration.
+    """
+    model: str  # LLM model identifier (e.g., "gpt-4", "claude-3-opus")
+    temperature: float  # Sampling temperature (0.00 to 2.00)
+    max_tokens: int  # Maximum output tokens
+    top_p: float  # Nucleus sampling parameter (0.00 to 1.00)
+    frequency_penalty: float  # Repetition penalty (-2.00 to 2.00)
+    presence_penalty: float  # Topic diversity penalty (-2.00 to 2.00)
+    stop_sequences: List[str]  # Array of stop tokens
+
+
+class GetAgentOptions(Hyperparameters, total=False):
+    """
+    Options for fetching and evaluating an agent.
 
     Attributes:
-        version: The version of the prompt to retrieve. If not specified, the latest version is used.
-                 Note: params and default_prompt are not updated remotely without version changes.
-        name: Optional name for the prompt for easier identification. Will fallback to id if not provided.
-        params: Parameters to substitute into the prompt. You can also nest prompt calls here.
+        major_version: The major version of the agent. SDK controls this value.
+                       When major_version changes, minor_version resets to 0.
+                       If not specified, defaults to 1.
+        name: Optional name for the agent for easier identification. Will fallback to id if not provided.
+        params: Parameters to substitute into the prompt. You can also nest agent calls here.
         default_prompt: The default prompt to use if none is found in the database.
                        The use of variables should be in the form {{variableName}}.
     """
-    version: str
+    major_version: int
     name: str
-    params: Dict[str, Union[str, "GetPromptOptions"]]
+    params: Dict[str, Union[str, "GetAgentOptions"]]
     default_prompt: str  # Required in practice
 
 
 # Type aliases
-ParamsValue = Union[str, GetPromptOptions]
+ParamsValue = Union[str, GetAgentOptions]
 Params = Dict[str, ParamsValue]
 SimpleParams = Dict[str, str]
 
@@ -49,45 +63,61 @@ class TrackConversationOptions(TypedDict):
     session_id: str
 
 
-class PromptNode(TypedDict):
-    """Internal representation of a prompt node in the tree."""
+class AgentNode(TypedDict, total=False):
+    """Internal representation of an agent node in the tree."""
     id: str
     name: Optional[str]
-    version: Optional[str]
+    major_version: Optional[int]
     params: SimpleParams
     prompt: str
-    children: List["PromptNode"]
+    children: List["AgentNode"]
+    # Hyperparameters
+    model: Optional[str]
+    temperature: Optional[float]
+    max_tokens: Optional[int]
+    top_p: Optional[float]
+    frequency_penalty: Optional[float]
+    presence_penalty: Optional[float]
+    stop_sequences: Optional[List[str]]
 
 
-class PromptRequestItem(TypedDict):
-    """A single prompt item in the API request."""
+class AgentRequestItem(TypedDict, total=False):
+    """A single agent item in the API request."""
     id: str
     name: Optional[str]
-    version: Optional[str]
+    majorVersion: Optional[int]  # camelCase to match TypeScript API
     prompt: str
     paramKeys: List[str]  # camelCase to match TypeScript API
     childrenIds: List[str]  # camelCase to match TypeScript API
+    # Hyperparameters
+    model: Optional[str]
+    temperature: Optional[float]
+    maxTokens: Optional[int]  # camelCase to match TypeScript API
+    topP: Optional[float]  # camelCase to match TypeScript API
+    frequencyPenalty: Optional[float]  # camelCase to match TypeScript API
+    presencePenalty: Optional[float]  # camelCase to match TypeScript API
+    stopSequences: Optional[List[str]]  # camelCase to match TypeScript API
 
 
-class PromptRequestPayload(TypedDict):
-    """The prompts payload structure."""
+class AgentRequestPayload(TypedDict):
+    """The agents payload structure."""
     rootId: str  # camelCase to match TypeScript API
-    map: Dict[str, PromptRequestItem]
+    map: Dict[str, AgentRequestItem]
 
 
-class PromptRequest(TypedDict):
-    """The request payload sent to the /sync_prompts endpoint."""
-    prompts: PromptRequestPayload
+class AgentRequest(TypedDict):
+    """The request payload sent to the /sync_agents endpoint."""
+    agents: AgentRequestPayload
 
 
-class PromptResponseItem(TypedDict):
-    """A single prompt response item."""
+class AgentResponseItem(TypedDict):
+    """A single agent response item."""
     prompt: str
 
 
-# The response received from the /sync_prompts endpoint
-# Key: prompt ID, Value: the newest prompt string
-PromptResponse = Dict[str, PromptResponseItem]
+# The response received from the /sync_agents endpoint
+# Key: agent ID, Value: the newest prompt string
+AgentResponse = Dict[str, AgentResponseItem]
 
 
 class TrackRequest(TypedDict):
@@ -103,7 +133,7 @@ TrackResponse = None
 
 
 # Type aliases for function signatures
-HonePrompt = Callable[[str, GetPromptOptions], Coroutine[Any, Any, str]]
+HoneAgent = Callable[[str, GetAgentOptions], Coroutine[Any, Any, str]]
 HoneTrack = Callable[[str, List[Message], TrackConversationOptions], Coroutine[Any, Any, None]]
 
 
@@ -113,13 +143,13 @@ class HoneClient(Protocol):
     Matches the TypeScript HoneClient type.
     """
 
-    async def prompt(self, id: str, options: GetPromptOptions) -> str:
+    async def agent(self, id: str, options: GetAgentOptions) -> str:
         """
-        Fetches and evaluates a prompt by its ID with the given options.
+        Fetches and evaluates an agent by its ID with the given options.
 
         Args:
-            id: The unique identifier for the prompt.
-            options: Options for fetching and evaluating the prompt.
+            id: The unique identifier for the agent.
+            options: Options for fetching and evaluating the agent.
 
         Returns:
             The evaluated prompt string.
@@ -141,3 +171,32 @@ class HoneClient(Protocol):
             options: TrackConversationOptions such as sessionId.
         """
         ...
+
+
+# ============================================================================
+# Backwards Compatibility Aliases (deprecated)
+# ============================================================================
+
+# Deprecated: Use GetAgentOptions instead
+GetPromptOptions = GetAgentOptions
+
+# Deprecated: Use AgentNode instead
+PromptNode = AgentNode
+
+# Deprecated: Use AgentRequestItem instead
+PromptRequestItem = AgentRequestItem
+
+# Deprecated: Use AgentRequestPayload instead
+PromptRequestPayload = AgentRequestPayload
+
+# Deprecated: Use AgentRequest instead
+PromptRequest = AgentRequest
+
+# Deprecated: Use AgentResponseItem instead
+PromptResponseItem = AgentResponseItem
+
+# Deprecated: Use AgentResponse instead
+PromptResponse = AgentResponse
+
+# Deprecated: Use HoneAgent instead
+HonePrompt = HoneAgent

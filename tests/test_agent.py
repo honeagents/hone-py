@@ -1,80 +1,117 @@
 """
-Unit tests for Hone SDK prompt utilities.
+Unit tests for Hone SDK agent utilities.
 
-Exact replica of TypeScript prompt.test.ts - tests all prompt utility functions.
+Exact replica of TypeScript agent.test.ts - tests all agent utility functions.
 """
 
 import pytest
 
-from hone.prompt import (
-    get_prompt_node,
-    evaluate_prompt,
+from hone.agent import (
+    get_agent_node,
+    evaluate_agent,
     insert_params_into_prompt,
-    traverse_prompt_node,
-    format_prompt_request,
-    update_prompt_nodes,
+    traverse_agent_node,
+    format_agent_request,
+    update_agent_nodes,
 )
-from hone.types import GetPromptOptions, PromptNode
+from hone.types import GetAgentOptions, AgentNode
 
 
-class TestGetPromptNode:
-    """Tests for get_prompt_node function."""
+class TestGetAgentNode:
+    """Tests for get_agent_node function."""
 
-    def test_should_create_simple_prompt_node_with_no_parameters(self):
-        """Should create a simple prompt node with no parameters."""
-        options: GetPromptOptions = {
+    def test_should_create_simple_agent_node_with_no_parameters(self):
+        """Should create a simple agent node with no parameters."""
+        options: GetAgentOptions = {
             "default_prompt": "Hello, World!",
         }
 
-        node = get_prompt_node("greeting", options)
+        node = get_agent_node("greeting", options)
 
         assert node == {
             "id": "greeting",
-            "version": None,
+            "major_version": None,
             "name": None,
             "params": {},
             "prompt": "Hello, World!",
             "children": [],
+            "model": None,
+            "temperature": None,
+            "max_tokens": None,
+            "top_p": None,
+            "frequency_penalty": None,
+            "presence_penalty": None,
+            "stop_sequences": None,
         }
 
-    def test_should_create_prompt_node_with_simple_string_parameters(self):
-        """Should create a prompt node with simple string parameters."""
-        options: GetPromptOptions = {
+    def test_should_create_agent_node_with_simple_string_parameters(self):
+        """Should create an agent node with simple string parameters."""
+        options: GetAgentOptions = {
             "default_prompt": "Hello, {{userName}}!",
             "params": {
                 "userName": "Alice",
             },
         }
 
-        node = get_prompt_node("greeting", options)
+        node = get_agent_node("greeting", options)
 
         assert node == {
             "id": "greeting",
-            "version": None,
+            "major_version": None,
             "name": None,
             "params": {
                 "userName": "Alice",
             },
             "prompt": "Hello, {{userName}}!",
             "children": [],
+            "model": None,
+            "temperature": None,
+            "max_tokens": None,
+            "top_p": None,
+            "frequency_penalty": None,
+            "presence_penalty": None,
+            "stop_sequences": None,
         }
 
-    def test_should_create_prompt_node_with_version_and_name(self):
-        """Should create a prompt node with version and name."""
-        options: GetPromptOptions = {
-            "version": "v1",
-            "name": "greeting-prompt",
+    def test_should_create_agent_node_with_major_version_and_name(self):
+        """Should create an agent node with majorVersion and name."""
+        options: GetAgentOptions = {
+            "major_version": 1,
+            "name": "greeting-agent",
             "default_prompt": "Hello!",
         }
 
-        node = get_prompt_node("greeting", options)
+        node = get_agent_node("greeting", options)
 
-        assert node["version"] == "v1"
-        assert node["name"] == "greeting-prompt"
+        assert node["major_version"] == 1
+        assert node["name"] == "greeting-agent"
 
-    def test_should_create_nested_prompt_nodes_from_nested_options(self):
-        """Should create nested prompt nodes from nested options."""
-        options: GetPromptOptions = {
+    def test_should_create_agent_node_with_hyperparameters(self):
+        """Should create an agent node with hyperparameters."""
+        options: GetAgentOptions = {
+            "default_prompt": "Hello!",
+            "model": "gpt-4",
+            "temperature": 0.7,
+            "max_tokens": 1000,
+            "top_p": 0.9,
+            "frequency_penalty": 0.5,
+            "presence_penalty": 0.3,
+            "stop_sequences": ["END", "STOP"],
+        }
+
+        node = get_agent_node("greeting", options)
+
+        assert node["model"] == "gpt-4"
+        assert node["temperature"] == 0.7
+        assert node["max_tokens"] == 1000
+        assert node["top_p"] == 0.9
+        assert node["frequency_penalty"] == 0.5
+        assert node["presence_penalty"] == 0.3
+        assert node["stop_sequences"] == ["END", "STOP"]
+
+    def test_should_create_nested_agent_nodes_from_nested_options(self):
+        """Should create nested agent nodes from nested options."""
+        options: GetAgentOptions = {
             "default_prompt": "Intro: {{introduction}}",
             "params": {
                 "introduction": {
@@ -86,16 +123,16 @@ class TestGetPromptNode:
             },
         }
 
-        node = get_prompt_node("main", options)
+        node = get_agent_node("main", options)
 
         assert node["id"] == "main"
         assert len(node["children"]) == 1
         assert node["children"][0]["id"] == "introduction"
         assert node["children"][0]["params"] == {"userName": "Bob"}
 
-    def test_should_handle_multiple_nested_prompts(self):
-        """Should handle multiple nested prompts."""
-        options: GetPromptOptions = {
+    def test_should_handle_multiple_nested_agents(self):
+        """Should handle multiple nested agents."""
+        options: GetAgentOptions = {
             "default_prompt": "{{header}} Content: {{body}} {{footer}}",
             "params": {
                 "header": {
@@ -113,28 +150,28 @@ class TestGetPromptNode:
             },
         }
 
-        node = get_prompt_node("document", options)
+        node = get_agent_node("document", options)
 
         assert len(node["children"]) == 3
         assert [c["id"] for c in node["children"]] == ["header", "body", "footer"]
 
-    def test_should_throw_error_for_self_referencing_prompts(self):
-        """Should throw an error for self-referencing prompts."""
-        options: GetPromptOptions = {
-            "default_prompt": "This is a prompt that references {{system-prompt}}",
+    def test_should_throw_error_for_self_referencing_agents(self):
+        """Should throw an error for self-referencing agents."""
+        options: GetAgentOptions = {
+            "default_prompt": "This is an agent that references {{system-agent}}",
             "params": {
-                "system-prompt": {
+                "system-agent": {
                     "default_prompt": "This should cause an error",
                 },
             },
         }
 
         with pytest.raises(ValueError):
-            get_prompt_node("system-prompt", options)
+            get_agent_node("system-agent", options)
 
-    def test_should_throw_error_for_circular_prompt_references(self):
-        """Should throw an error for circular prompt references."""
-        options: GetPromptOptions = {
+    def test_should_throw_error_for_circular_agent_references(self):
+        """Should throw an error for circular agent references."""
+        options: GetAgentOptions = {
             "default_prompt": "A references {{b}}",
             "params": {
                 "b": {
@@ -149,11 +186,11 @@ class TestGetPromptNode:
         }
 
         with pytest.raises(ValueError):
-            get_prompt_node("a", options)
+            get_agent_node("a", options)
 
-    def test_should_throw_error_when_prompt_has_placeholders_without_matching_parameters(self):
-        """Should throw an error when prompt has placeholders without matching parameters."""
-        options: GetPromptOptions = {
+    def test_should_throw_error_when_agent_has_placeholders_without_matching_parameters(self):
+        """Should throw an error when agent has placeholders without matching parameters."""
+        options: GetAgentOptions = {
             "default_prompt": "Hello {{name}}, your role is {{role}}",
             "params": {
                 "name": "Alice",
@@ -161,15 +198,15 @@ class TestGetPromptNode:
             },
         }
 
-        node = get_prompt_node("greeting", options)
+        node = get_agent_node("greeting", options)
 
         # Should throw when evaluating because 'role' placeholder has no value
         with pytest.raises(ValueError, match=r"(?i)missing parameter.*role"):
-            evaluate_prompt(node)
+            evaluate_agent(node)
 
     def test_should_throw_error_listing_all_missing_parameters(self):
         """Should throw an error listing all missing parameters."""
-        options: GetPromptOptions = {
+        options: GetAgentOptions = {
             "default_prompt": "{{greeting}} {{name}}, you are {{role}} in {{location}}",
             "params": {
                 "name": "Bob",
@@ -177,10 +214,10 @@ class TestGetPromptNode:
             },
         }
 
-        node = get_prompt_node("test", options)
+        node = get_agent_node("test", options)
 
         with pytest.raises(ValueError, match=r"(?i)missing parameter"):
-            evaluate_prompt(node)
+            evaluate_agent(node)
 
 
 class TestInsertParamsIntoPrompt:
@@ -242,36 +279,36 @@ class TestInsertParamsIntoPrompt:
         assert result == "Message: Special chars: $, *, (, )"
 
 
-class TestEvaluatePrompt:
-    """Tests for evaluate_prompt function."""
+class TestEvaluateAgent:
+    """Tests for evaluate_agent function."""
 
-    def test_should_evaluate_simple_prompt_with_params(self):
-        """Should evaluate a simple prompt with params."""
-        node: PromptNode = {
+    def test_should_evaluate_simple_agent_with_params(self):
+        """Should evaluate a simple agent with params."""
+        node: AgentNode = {
             "id": "greeting",
             "name": None,
-            "version": None,
+            "major_version": None,
             "params": {"userName": "Alice"},
             "prompt": "Hello, {{userName}}!",
             "children": [],
         }
 
-        result = evaluate_prompt(node)
+        result = evaluate_agent(node)
         assert result == "Hello, Alice!"
 
-    def test_should_evaluate_nested_prompts_depth_first(self):
-        """Should evaluate nested prompts depth-first."""
-        node: PromptNode = {
+    def test_should_evaluate_nested_agents_depth_first(self):
+        """Should evaluate nested agents depth-first."""
+        node: AgentNode = {
             "id": "main",
             "name": None,
-            "version": None,
+            "major_version": None,
             "params": {},
             "prompt": "Intro: {{introduction}}",
             "children": [
                 {
                     "id": "introduction",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {"userName": "Bob"},
                     "prompt": "Hello, {{userName}}!",
                     "children": [],
@@ -279,29 +316,29 @@ class TestEvaluatePrompt:
             ],
         }
 
-        result = evaluate_prompt(node)
+        result = evaluate_agent(node)
         assert result == "Intro: Hello, Bob!"
 
     def test_should_evaluate_multiple_levels_of_nesting(self):
         """Should evaluate multiple levels of nesting."""
-        node: PromptNode = {
+        node: AgentNode = {
             "id": "main",
             "name": None,
-            "version": None,
+            "major_version": None,
             "params": {},
             "prompt": "Doc: {{section}}",
             "children": [
                 {
                     "id": "section",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {},
                     "prompt": "Section: {{paragraph}}",
                     "children": [
                         {
                             "id": "paragraph",
                             "name": None,
-                            "version": None,
+                            "major_version": None,
                             "params": {"text": "content"},
                             "prompt": "Para: {{text}}",
                             "children": [],
@@ -311,22 +348,22 @@ class TestEvaluatePrompt:
             ],
         }
 
-        result = evaluate_prompt(node)
+        result = evaluate_agent(node)
         assert result == "Doc: Section: Para: content"
 
     def test_should_handle_multiple_children(self):
         """Should handle multiple children."""
-        node: PromptNode = {
+        node: AgentNode = {
             "id": "document",
             "name": None,
-            "version": None,
+            "major_version": None,
             "params": {},
             "prompt": "{{header}}\n{{body}}\n{{footer}}",
             "children": [
                 {
                     "id": "header",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {},
                     "prompt": "HEADER",
                     "children": [],
@@ -334,7 +371,7 @@ class TestEvaluatePrompt:
                 {
                     "id": "body",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {"content": "text"},
                     "prompt": "Body: {{content}}",
                     "children": [],
@@ -342,7 +379,7 @@ class TestEvaluatePrompt:
                 {
                     "id": "footer",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {},
                     "prompt": "FOOTER",
                     "children": [],
@@ -350,63 +387,63 @@ class TestEvaluatePrompt:
             ],
         }
 
-        result = evaluate_prompt(node)
+        result = evaluate_agent(node)
         assert result == "HEADER\nBody: text\nFOOTER"
 
-    def test_should_handle_prompt_with_no_children_or_params(self):
-        """Should handle prompt with no children or params."""
-        node: PromptNode = {
+    def test_should_handle_agent_with_no_children_or_params(self):
+        """Should handle agent with no children or params."""
+        node: AgentNode = {
             "id": "simple",
             "name": None,
-            "version": None,
+            "major_version": None,
             "params": {},
             "prompt": "Static text",
             "children": [],
         }
 
-        result = evaluate_prompt(node)
+        result = evaluate_agent(node)
         assert result == "Static text"
 
     def test_should_cache_evaluated_nodes(self):
         """Should cache evaluated nodes to avoid recomputation."""
-        shared_child: PromptNode = {
+        shared_child: AgentNode = {
             "id": "shared",
             "name": None,
-            "version": None,
+            "major_version": None,
             "params": {},
             "prompt": "Shared",
             "children": [],
         }
 
-        node: PromptNode = {
+        node: AgentNode = {
             "id": "main",
             "name": None,
-            "version": None,
+            "major_version": None,
             "params": {},
             "prompt": "{{shared}}",
             "children": [shared_child],
         }
 
-        result = evaluate_prompt(node)
+        result = evaluate_agent(node)
         assert result == "Shared"
 
 
-class TestTraversePromptNode:
-    """Tests for traverse_prompt_node function."""
+class TestTraverseAgentNode:
+    """Tests for traverse_agent_node function."""
 
     def test_should_visit_single_node(self):
         """Should visit single node."""
-        node: PromptNode = {
+        node: AgentNode = {
             "id": "root",
             "name": None,
-            "version": None,
+            "major_version": None,
             "params": {},
             "prompt": "test",
             "children": [],
         }
 
         visited = []
-        traverse_prompt_node(
+        traverse_agent_node(
             node,
             lambda n, parent_id: visited.append({"id": n["id"], "parent_id": parent_id}),
         )
@@ -415,24 +452,24 @@ class TestTraversePromptNode:
 
     def test_should_visit_nodes_in_depth_first_order(self):
         """Should visit nodes in depth-first order."""
-        node: PromptNode = {
+        node: AgentNode = {
             "id": "root",
             "name": None,
-            "version": None,
+            "major_version": None,
             "params": {},
             "prompt": "test",
             "children": [
                 {
                     "id": "child1",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {},
                     "prompt": "test",
                     "children": [
                         {
                             "id": "grandchild1",
                             "name": None,
-                            "version": None,
+                            "major_version": None,
                             "params": {},
                             "prompt": "test",
                             "children": [],
@@ -442,7 +479,7 @@ class TestTraversePromptNode:
                 {
                     "id": "child2",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {},
                     "prompt": "test",
                     "children": [],
@@ -451,30 +488,30 @@ class TestTraversePromptNode:
         }
 
         visited = []
-        traverse_prompt_node(node, lambda n, _: visited.append(n["id"]))
+        traverse_agent_node(node, lambda n, _: visited.append(n["id"]))
 
         assert visited == ["root", "child1", "grandchild1", "child2"]
 
     def test_should_pass_correct_parent_id_to_callback(self):
         """Should pass correct parent ID to callback."""
-        node: PromptNode = {
+        node: AgentNode = {
             "id": "root",
             "name": None,
-            "version": None,
+            "major_version": None,
             "params": {},
             "prompt": "test",
             "children": [
                 {
                     "id": "child1",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {},
                     "prompt": "test",
                     "children": [
                         {
                             "id": "grandchild1",
                             "name": None,
-                            "version": None,
+                            "major_version": None,
                             "params": {},
                             "prompt": "test",
                             "children": [],
@@ -484,7 +521,7 @@ class TestTraversePromptNode:
                 {
                     "id": "child2",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {},
                     "prompt": "test",
                     "children": [],
@@ -493,7 +530,7 @@ class TestTraversePromptNode:
         }
 
         relationships = []
-        traverse_prompt_node(
+        traverse_agent_node(
             node,
             lambda n, parent_id: relationships.append({"id": n["id"], "parent_id": parent_id}),
         )
@@ -506,45 +543,52 @@ class TestTraversePromptNode:
         ]
 
 
-class TestFormatPromptRequest:
-    """Tests for format_prompt_request function."""
+class TestFormatAgentRequest:
+    """Tests for format_agent_request function."""
 
-    def test_should_format_simple_prompt_node(self):
-        """Should format a simple prompt node."""
-        node: PromptNode = {
+    def test_should_format_simple_agent_node(self):
+        """Should format a simple agent node."""
+        node: AgentNode = {
             "id": "greeting",
-            "name": "greeting-prompt",
-            "version": "v1",
+            "name": "greeting-agent",
+            "major_version": 1,
             "params": {"userName": "Alice"},
             "prompt": "Hello, {{userName}}!",
             "children": [],
         }
 
-        request = format_prompt_request(node)
+        request = format_agent_request(node)
 
-        assert request["prompts"]["rootId"] == "greeting"
-        assert request["prompts"]["map"]["greeting"] == {
+        assert request["agents"]["rootId"] == "greeting"
+        assert request["agents"]["map"]["greeting"] == {
             "id": "greeting",
-            "name": "greeting-prompt",
-            "version": "v1",
+            "name": "greeting-agent",
+            "majorVersion": 1,
             "prompt": "Hello, {{userName}}!",
             "paramKeys": ["userName"],
             "childrenIds": [],
+            "model": None,
+            "temperature": None,
+            "maxTokens": None,
+            "topP": None,
+            "frequencyPenalty": None,
+            "presencePenalty": None,
+            "stopSequences": None,
         }
 
-    def test_should_format_nested_prompt_nodes(self):
-        """Should format nested prompt nodes."""
-        node: PromptNode = {
+    def test_should_format_nested_agent_nodes(self):
+        """Should format nested agent nodes."""
+        node: AgentNode = {
             "id": "main",
             "name": None,
-            "version": None,
+            "major_version": None,
             "params": {},
             "prompt": "Intro: {{introduction}}",
             "children": [
                 {
                     "id": "introduction",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {"userName": "Bob"},
                     "prompt": "Hello, {{userName}}!",
                     "children": [],
@@ -552,46 +596,88 @@ class TestFormatPromptRequest:
             ],
         }
 
-        request = format_prompt_request(node)
+        request = format_agent_request(node)
 
-        assert request["prompts"]["rootId"] == "main"
-        assert request["prompts"]["map"]["main"] == {
+        assert request["agents"]["rootId"] == "main"
+        assert request["agents"]["map"]["main"] == {
             "id": "main",
             "name": None,
-            "version": None,
+            "majorVersion": None,
             "prompt": "Intro: {{introduction}}",
             "paramKeys": ["introduction"],
             "childrenIds": ["introduction"],
+            "model": None,
+            "temperature": None,
+            "maxTokens": None,
+            "topP": None,
+            "frequencyPenalty": None,
+            "presencePenalty": None,
+            "stopSequences": None,
         }
-        assert request["prompts"]["map"]["introduction"] == {
+        assert request["agents"]["map"]["introduction"] == {
             "id": "introduction",
             "name": None,
-            "version": None,
+            "majorVersion": None,
             "prompt": "Hello, {{userName}}!",
             "paramKeys": ["userName"],
             "childrenIds": [],
+            "model": None,
+            "temperature": None,
+            "maxTokens": None,
+            "topP": None,
+            "frequencyPenalty": None,
+            "presencePenalty": None,
+            "stopSequences": None,
         }
+
+    def test_should_format_agent_node_with_hyperparameters(self):
+        """Should format agent node with hyperparameters."""
+        node: AgentNode = {
+            "id": "greeting",
+            "name": None,
+            "major_version": None,
+            "params": {},
+            "prompt": "Hello!",
+            "children": [],
+            "model": "gpt-4",
+            "temperature": 0.7,
+            "max_tokens": 1000,
+            "top_p": 0.9,
+            "frequency_penalty": 0.5,
+            "presence_penalty": 0.3,
+            "stop_sequences": ["END"],
+        }
+
+        request = format_agent_request(node)
+
+        assert request["agents"]["map"]["greeting"]["model"] == "gpt-4"
+        assert request["agents"]["map"]["greeting"]["temperature"] == 0.7
+        assert request["agents"]["map"]["greeting"]["maxTokens"] == 1000
+        assert request["agents"]["map"]["greeting"]["topP"] == 0.9
+        assert request["agents"]["map"]["greeting"]["frequencyPenalty"] == 0.5
+        assert request["agents"]["map"]["greeting"]["presencePenalty"] == 0.3
+        assert request["agents"]["map"]["greeting"]["stopSequences"] == ["END"]
 
     def test_should_format_deeply_nested_structure(self):
         """Should format deeply nested structure."""
-        node: PromptNode = {
+        node: AgentNode = {
             "id": "doc",
             "name": None,
-            "version": None,
+            "major_version": None,
             "params": {},
             "prompt": "{{section}}",
             "children": [
                 {
                     "id": "section",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {},
                     "prompt": "{{paragraph}}",
                     "children": [
                         {
                             "id": "paragraph",
                             "name": None,
-                            "version": None,
+                            "major_version": None,
                             "params": {"text": "content"},
                             "prompt": "{{text}}",
                             "children": [],
@@ -601,27 +687,27 @@ class TestFormatPromptRequest:
             ],
         }
 
-        request = format_prompt_request(node)
+        request = format_agent_request(node)
 
-        assert request["prompts"]["rootId"] == "doc"
-        assert len(request["prompts"]["map"]) == 3
-        assert request["prompts"]["map"]["doc"]["childrenIds"] == ["section"]
-        assert request["prompts"]["map"]["section"]["childrenIds"] == ["paragraph"]
-        assert request["prompts"]["map"]["paragraph"]["paramKeys"] == ["text"]
+        assert request["agents"]["rootId"] == "doc"
+        assert len(request["agents"]["map"]) == 3
+        assert request["agents"]["map"]["doc"]["childrenIds"] == ["section"]
+        assert request["agents"]["map"]["section"]["childrenIds"] == ["paragraph"]
+        assert request["agents"]["map"]["paragraph"]["paramKeys"] == ["text"]
 
     def test_should_handle_multiple_children(self):
         """Should handle multiple children."""
-        node: PromptNode = {
+        node: AgentNode = {
             "id": "document",
             "name": None,
-            "version": None,
+            "major_version": None,
             "params": {},
             "prompt": "{{header}} {{body}} {{footer}}",
             "children": [
                 {
                     "id": "header",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {},
                     "prompt": "HEADER",
                     "children": [],
@@ -629,7 +715,7 @@ class TestFormatPromptRequest:
                 {
                     "id": "body",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {"content": "text"},
                     "prompt": "{{content}}",
                     "children": [],
@@ -637,7 +723,7 @@ class TestFormatPromptRequest:
                 {
                     "id": "footer",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {},
                     "prompt": "FOOTER",
                     "children": [],
@@ -645,48 +731,48 @@ class TestFormatPromptRequest:
             ],
         }
 
-        request = format_prompt_request(node)
+        request = format_agent_request(node)
 
-        assert request["prompts"]["map"]["document"]["childrenIds"] == [
+        assert request["agents"]["map"]["document"]["childrenIds"] == [
             "header",
             "body",
             "footer",
         ]
-        assert len(request["prompts"]["map"]) == 4
+        assert len(request["agents"]["map"]) == 4
 
 
-class TestUpdatePromptNodes:
-    """Tests for update_prompt_nodes function."""
+class TestUpdateAgentNodes:
+    """Tests for update_agent_nodes function."""
 
     def test_should_update_single_node(self):
         """Should update a single node."""
-        node: PromptNode = {
+        node: AgentNode = {
             "id": "greeting",
             "name": None,
-            "version": None,
+            "major_version": None,
             "params": {},
             "prompt": "Old prompt",
             "children": [],
         }
 
-        updated = update_prompt_nodes(node, lambda n: {**n, "prompt": "New prompt"})
+        updated = update_agent_nodes(node, lambda n: {**n, "prompt": "New prompt"})
 
         assert updated["prompt"] == "New prompt"
         assert updated["id"] == "greeting"
 
     def test_should_update_all_nodes_in_nested_structure(self):
         """Should update all nodes in a nested structure."""
-        node: PromptNode = {
+        node: AgentNode = {
             "id": "root",
             "name": None,
-            "version": None,
+            "major_version": None,
             "params": {},
             "prompt": "root",
             "children": [
                 {
                     "id": "child1",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {},
                     "prompt": "child1",
                     "children": [],
@@ -694,7 +780,7 @@ class TestUpdatePromptNodes:
                 {
                     "id": "child2",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {},
                     "prompt": "child2",
                     "children": [],
@@ -702,7 +788,7 @@ class TestUpdatePromptNodes:
             ],
         }
 
-        updated = update_prompt_nodes(node, lambda n: {**n, "prompt": f"updated-{n['id']}"})
+        updated = update_agent_nodes(node, lambda n: {**n, "prompt": f"updated-{n['id']}"})
 
         assert updated["prompt"] == "updated-root"
         assert updated["children"][0]["prompt"] == "updated-child1"
@@ -710,24 +796,24 @@ class TestUpdatePromptNodes:
 
     def test_should_update_deeply_nested_nodes(self):
         """Should update deeply nested nodes."""
-        node: PromptNode = {
+        node: AgentNode = {
             "id": "level1",
             "name": None,
-            "version": None,
+            "major_version": None,
             "params": {},
             "prompt": "level1",
             "children": [
                 {
                     "id": "level2",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {},
                     "prompt": "level2",
                     "children": [
                         {
                             "id": "level3",
                             "name": None,
-                            "version": None,
+                            "major_version": None,
                             "params": {},
                             "prompt": "level3",
                             "children": [],
@@ -737,7 +823,7 @@ class TestUpdatePromptNodes:
             ],
         }
 
-        updated = update_prompt_nodes(node, lambda n: {**n, "prompt": f"{n['prompt']}-updated"})
+        updated = update_agent_nodes(node, lambda n: {**n, "prompt": f"{n['prompt']}-updated"})
 
         assert updated["prompt"] == "level1-updated"
         assert updated["children"][0]["prompt"] == "level2-updated"
@@ -745,17 +831,17 @@ class TestUpdatePromptNodes:
 
     def test_should_preserve_node_structure_while_updating(self):
         """Should preserve node structure while updating."""
-        node: PromptNode = {
+        node: AgentNode = {
             "id": "root",
             "name": "root-name",
-            "version": "v1",
+            "major_version": 1,
             "params": {"key": "value"},
             "prompt": "original",
             "children": [
                 {
                     "id": "child",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {},
                     "prompt": "child-original",
                     "children": [],
@@ -763,28 +849,28 @@ class TestUpdatePromptNodes:
             ],
         }
 
-        updated = update_prompt_nodes(node, lambda n: {**n, "prompt": n["prompt"].upper()})
+        updated = update_agent_nodes(node, lambda n: {**n, "prompt": n["prompt"].upper()})
 
         assert updated["id"] == "root"
         assert updated["name"] == "root-name"
-        assert updated["version"] == "v1"
+        assert updated["major_version"] == 1
         assert updated["params"] == {"key": "value"}
         assert updated["prompt"] == "ORIGINAL"
         assert updated["children"][0]["prompt"] == "CHILD-ORIGINAL"
 
     def test_should_allow_conditional_updates(self):
         """Should allow conditional updates."""
-        node: PromptNode = {
+        node: AgentNode = {
             "id": "root",
             "name": None,
-            "version": None,
+            "major_version": None,
             "params": {},
             "prompt": "root",
             "children": [
                 {
                     "id": "update-me",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {},
                     "prompt": "old",
                     "children": [],
@@ -792,7 +878,7 @@ class TestUpdatePromptNodes:
                 {
                     "id": "leave-me",
                     "name": None,
-                    "version": None,
+                    "major_version": None,
                     "params": {},
                     "prompt": "unchanged",
                     "children": [],
@@ -805,7 +891,7 @@ class TestUpdatePromptNodes:
                 return {**n, "prompt": "new"}
             return n
 
-        updated = update_prompt_nodes(node, conditional_update)
+        updated = update_agent_nodes(node, conditional_update)
 
         assert updated["children"][0]["prompt"] == "new"
         assert updated["children"][1]["prompt"] == "unchanged"

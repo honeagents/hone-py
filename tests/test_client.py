@@ -13,7 +13,7 @@ import pytest
 import respx
 
 from hone.client import Hone, create_hone_client, DEFAULT_BASE_URL, SUPABASE_ANON_KEY
-from hone.types import HoneConfig, Message, PromptResponse
+from hone.types import HoneConfig, Message, AgentResponse
 
 
 class TestHoneConstructor:
@@ -67,8 +67,8 @@ class TestHoneConstructor:
                 del os.environ["HONE_API_URL"]
 
 
-class TestHonePrompt:
-    """Tests for Hone.prompt method."""
+class TestHoneAgent:
+    """Tests for Hone.agent method."""
 
     @pytest.fixture
     def mock_api_key(self):
@@ -80,17 +80,17 @@ class TestHonePrompt:
 
     @respx.mock
     @pytest.mark.asyncio
-    async def test_should_fetch_prompt_successfully_and_return_evaluated_result(self, client):
-        """Should fetch prompt successfully and return evaluated result."""
-        mock_response: PromptResponse = {
+    async def test_should_fetch_agent_successfully_and_return_evaluated_result(self, client):
+        """Should fetch agent successfully and return evaluated result."""
+        mock_response: AgentResponse = {
             "greeting": {"prompt": "Hello, {{userName}}! Welcome."},
         }
 
-        respx.post(f"{DEFAULT_BASE_URL}/sync_prompts").mock(
+        respx.post(f"{DEFAULT_BASE_URL}/sync_agents").mock(
             return_value=httpx.Response(200, json=mock_response)
         )
 
-        result = await client.prompt("greeting", {
+        result = await client.agent("greeting", {
             "default_prompt": "Hi, {{userName}}!",
             "params": {
                 "userName": "Alice",
@@ -101,13 +101,13 @@ class TestHonePrompt:
 
     @respx.mock
     @pytest.mark.asyncio
-    async def test_should_use_fallback_prompt_when_api_call_fails(self, client, capsys):
-        """Should use fallback prompt when API call fails."""
-        respx.post(f"{DEFAULT_BASE_URL}/sync_prompts").mock(
+    async def test_should_use_fallback_agent_when_api_call_fails(self, client, capsys):
+        """Should use fallback agent when API call fails."""
+        respx.post(f"{DEFAULT_BASE_URL}/sync_agents").mock(
             side_effect=httpx.RequestError("Network error")
         )
 
-        result = await client.prompt("greeting", {
+        result = await client.agent("greeting", {
             "default_prompt": "Hi, {{userName}}!",
             "params": {
                 "userName": "Bob",
@@ -116,22 +116,22 @@ class TestHonePrompt:
 
         assert result == "Hi, Bob!"
         captured = capsys.readouterr()
-        assert "Error fetching prompt, using fallback:" in captured.out
+        assert "Error fetching agent, using fallback:" in captured.out
 
     @respx.mock
     @pytest.mark.asyncio
-    async def test_should_handle_nested_prompts(self, client):
-        """Should handle nested prompts."""
-        mock_response: PromptResponse = {
+    async def test_should_handle_nested_agents(self, client):
+        """Should handle nested agents."""
+        mock_response: AgentResponse = {
             "main": {"prompt": "Welcome: {{intro}}"},
             "intro": {"prompt": "Hello, {{userName}}!"},
         }
 
-        respx.post(f"{DEFAULT_BASE_URL}/sync_prompts").mock(
+        respx.post(f"{DEFAULT_BASE_URL}/sync_agents").mock(
             return_value=httpx.Response(200, json=mock_response)
         )
 
-        result = await client.prompt("main", {
+        result = await client.agent("main", {
             "default_prompt": "Fallback: {{intro}}",
             "params": {
                 "intro": {
@@ -147,17 +147,17 @@ class TestHonePrompt:
 
     @respx.mock
     @pytest.mark.asyncio
-    async def test_should_handle_prompt_with_no_parameters(self, client):
-        """Should handle prompt with no parameters."""
-        mock_response: PromptResponse = {
+    async def test_should_handle_agent_with_no_parameters(self, client):
+        """Should handle agent with no parameters."""
+        mock_response: AgentResponse = {
             "static": {"prompt": "This is a static prompt"},
         }
 
-        respx.post(f"{DEFAULT_BASE_URL}/sync_prompts").mock(
+        respx.post(f"{DEFAULT_BASE_URL}/sync_agents").mock(
             return_value=httpx.Response(200, json=mock_response)
         )
 
-        result = await client.prompt("static", {
+        result = await client.agent("static", {
             "default_prompt": "Fallback static",
         })
 
@@ -167,11 +167,11 @@ class TestHonePrompt:
     @pytest.mark.asyncio
     async def test_should_use_fallback_when_api_returns_error_status(self, client, capsys):
         """Should use fallback when API returns error status."""
-        respx.post(f"{DEFAULT_BASE_URL}/sync_prompts").mock(
-            return_value=httpx.Response(404, json={"message": "Prompt not found"})
+        respx.post(f"{DEFAULT_BASE_URL}/sync_agents").mock(
+            return_value=httpx.Response(404, json={"message": "Agent not found"})
         )
 
-        result = await client.prompt("missing", {
+        result = await client.agent("missing", {
             "default_prompt": "Fallback prompt",
         })
 
@@ -179,18 +179,18 @@ class TestHonePrompt:
 
     @respx.mock
     @pytest.mark.asyncio
-    async def test_should_handle_version_and_name_in_prompt_options(self, client):
-        """Should handle version and name in prompt options."""
+    async def test_should_handle_major_version_and_name_in_agent_options(self, client):
+        """Should handle majorVersion and name in agent options."""
         mock_response = {
             "greeting-v2": {"prompt": "Hello v2!"},
         }
 
-        route = respx.post(f"{DEFAULT_BASE_URL}/sync_prompts").mock(
+        route = respx.post(f"{DEFAULT_BASE_URL}/sync_agents").mock(
             return_value=httpx.Response(200, json=mock_response)
         )
 
-        await client.prompt("greeting-v2", {
-            "version": "v2",
+        await client.agent("greeting-v2", {
+            "major_version": 2,
             "name": "greeting",
             "default_prompt": "Hello v1!",
         })
@@ -198,18 +198,18 @@ class TestHonePrompt:
         # Verify request body
         request = route.calls.last.request
         body = json.loads(request.content)
-        assert body["prompts"]["map"]["greeting-v2"]["version"] == "v2"
-        assert body["prompts"]["map"]["greeting-v2"]["name"] == "greeting"
+        assert body["agents"]["map"]["greeting-v2"]["majorVersion"] == 2
+        assert body["agents"]["map"]["greeting-v2"]["name"] == "greeting"
 
     @respx.mock
     @pytest.mark.asyncio
     async def test_should_send_correct_request_format_to_api(self, client):
         """Should send correct request format to API."""
-        route = respx.post(f"{DEFAULT_BASE_URL}/sync_prompts").mock(
+        route = respx.post(f"{DEFAULT_BASE_URL}/sync_agents").mock(
             return_value=httpx.Response(200, json={})
         )
 
-        await client.prompt("test", {
+        await client.agent("test", {
             "default_prompt": "Test {{param1}}",
             "params": {
                 "param1": "value1",
@@ -219,16 +219,53 @@ class TestHonePrompt:
         request = route.calls.last.request
         body = json.loads(request.content)
 
-        assert body["prompts"]["rootId"] == "test"
-        assert "map" in body["prompts"]
-        assert body["prompts"]["map"]["test"] == {
+        assert body["agents"]["rootId"] == "test"
+        assert "map" in body["agents"]
+        assert body["agents"]["map"]["test"] == {
             "id": "test",
             "name": None,
-            "version": None,
+            "majorVersion": None,
             "prompt": "Test {{param1}}",
             "paramKeys": ["param1"],
             "childrenIds": [],
+            "model": None,
+            "temperature": None,
+            "maxTokens": None,
+            "topP": None,
+            "frequencyPenalty": None,
+            "presencePenalty": None,
+            "stopSequences": None,
         }
+
+    @respx.mock
+    @pytest.mark.asyncio
+    async def test_should_send_hyperparameters_in_request(self, client):
+        """Should send hyperparameters in request."""
+        route = respx.post(f"{DEFAULT_BASE_URL}/sync_agents").mock(
+            return_value=httpx.Response(200, json={})
+        )
+
+        await client.agent("test", {
+            "default_prompt": "Test prompt",
+            "model": "gpt-4",
+            "temperature": 0.7,
+            "max_tokens": 1000,
+            "top_p": 0.9,
+            "frequency_penalty": 0.5,
+            "presence_penalty": 0.3,
+            "stop_sequences": ["END"],
+        })
+
+        request = route.calls.last.request
+        body = json.loads(request.content)
+
+        assert body["agents"]["map"]["test"]["model"] == "gpt-4"
+        assert body["agents"]["map"]["test"]["temperature"] == 0.7
+        assert body["agents"]["map"]["test"]["maxTokens"] == 1000
+        assert body["agents"]["map"]["test"]["topP"] == 0.9
+        assert body["agents"]["map"]["test"]["frequencyPenalty"] == 0.5
+        assert body["agents"]["map"]["test"]["presencePenalty"] == 0.3
+        assert body["agents"]["map"]["test"]["stopSequences"] == ["END"]
 
 
 class TestHoneTrack:
@@ -400,7 +437,7 @@ class TestCreateHoneClientFactory:
         client = create_hone_client(config)
 
         assert isinstance(client, Hone)
-        assert hasattr(client, "prompt")
+        assert hasattr(client, "agent")
         assert hasattr(client, "track")
 
     def test_should_create_client_with_custom_config(self):
@@ -441,6 +478,7 @@ class TestHoneRequestHeaders:
         headers = request.headers
 
         assert headers["Content-Type"] == "application/json"
+        assert headers["x-api-key"] == mock_api_key
         assert headers["Authorization"] == f"Bearer {SUPABASE_ANON_KEY}"
         assert headers["User-Agent"] == "hone-sdk-python/0.1.0"
 

@@ -1,7 +1,7 @@
 """
-Prompt utilities for the Hone SDK.
+Agent utilities for the Hone SDK.
 
-Exact replica of TypeScript prompt.ts - handles prompt tree building,
+Exact replica of TypeScript agent.ts - handles agent tree building,
 evaluation, and formatting.
 """
 
@@ -9,31 +9,31 @@ import re
 from typing import Callable, Dict, List, Optional, Set, Any
 
 from .types import (
-    GetPromptOptions,
-    PromptNode,
-    PromptRequest,
-    PromptRequestItem,
-    PromptRequestPayload,
+    GetAgentOptions,
+    AgentNode,
+    AgentRequest,
+    AgentRequestItem,
+    AgentRequestPayload,
     SimpleParams,
 )
 
 
-def get_prompt_node(
+def get_agent_node(
     id: str,
-    options: GetPromptOptions,
+    options: GetAgentOptions,
     ancestor_ids: Optional[Set[str]] = None,
-) -> PromptNode:
+) -> AgentNode:
     """
-    Constructs a PromptNode from the given id and GetPromptOptions.
-    Traverses nested prompts recursively.
+    Constructs an AgentNode from the given id and GetAgentOptions.
+    Traverses nested agents recursively.
 
     Args:
-        id: the unique identifier for the prompt node
-        options: the GetPromptOptions containing prompt details and parameters
+        id: the unique identifier for the agent node
+        options: the GetAgentOptions containing agent details and parameters
         ancestor_ids: Set of ancestor IDs to detect circular references
 
     Returns:
-        The constructed PromptNode
+        The constructed AgentNode
 
     Raises:
         ValueError: if a self-reference or circular reference is detected
@@ -43,18 +43,18 @@ def get_prompt_node(
 
     params = options.get("params", {})
 
-    # Check for self-reference: if this prompt's params contain a key matching its own id
+    # Check for self-reference: if this agent's params contain a key matching its own id
     if params and id in params:
         raise ValueError(
-            f'Self-referencing prompt detected: prompt "{id}" cannot reference itself as a parameter'
+            f'Self-referencing agent detected: agent "{id}" cannot reference itself as a parameter'
         )
 
     # Check for circular reference: if this id is already in the ancestor chain
     if id in ancestor_ids:
         path = " -> ".join(list(ancestor_ids) + [id])
-        raise ValueError(f"Circular prompt reference detected: {path}")
+        raise ValueError(f"Circular agent reference detected: {path}")
 
-    children: List[PromptNode] = []
+    children: List[AgentNode] = []
     new_ancestor_ids = ancestor_ids | {id}
 
     simple_params: SimpleParams = {}
@@ -62,25 +62,33 @@ def get_prompt_node(
         if isinstance(value, str):
             simple_params[param_id] = value
         else:
-            # It's a nested GetPromptOptions
-            children.append(get_prompt_node(param_id, value, new_ancestor_ids))
+            # It's a nested GetAgentOptions
+            children.append(get_agent_node(param_id, value, new_ancestor_ids))
 
     return {
         "id": id,
-        "version": options.get("version"),
+        "major_version": options.get("major_version"),
         "name": options.get("name"),
         "params": simple_params,
         "prompt": options.get("default_prompt", ""),
         "children": children,
+        # Hyperparameters
+        "model": options.get("model"),
+        "temperature": options.get("temperature"),
+        "max_tokens": options.get("max_tokens"),
+        "top_p": options.get("top_p"),
+        "frequency_penalty": options.get("frequency_penalty"),
+        "presence_penalty": options.get("presence_penalty"),
+        "stop_sequences": options.get("stop_sequences"),
     }
 
 
-def evaluate_prompt(node: PromptNode) -> str:
+def evaluate_agent(node: AgentNode) -> str:
     """
-    Evaluates a PromptNode by recursively inserting parameters and nested prompts.
+    Evaluates an AgentNode by recursively inserting parameters and nested agents.
 
     Args:
-        node: The root PromptNode to evaluate.
+        node: The root AgentNode to evaluate.
 
     Returns:
         The fully evaluated prompt string.
@@ -90,7 +98,7 @@ def evaluate_prompt(node: PromptNode) -> str:
     """
     evaluated: Dict[str, str] = {}
 
-    def evaluate(n: PromptNode) -> str:
+    def evaluate(n: AgentNode) -> str:
         if n["id"] in evaluated:
             return evaluated[n["id"]]
 
@@ -101,7 +109,7 @@ def evaluate_prompt(node: PromptNode) -> str:
             params[child["id"]] = evaluate(child)
 
         # Validate that all placeholders have corresponding parameters
-        _validate_prompt_params(n["prompt"], params, n["id"])
+        _validate_agent_params(n["prompt"], params, n["id"])
 
         # Insert evaluated children into this prompt
         result = insert_params_into_prompt(n["prompt"], params)
@@ -111,7 +119,7 @@ def evaluate_prompt(node: PromptNode) -> str:
     return evaluate(node)
 
 
-def _validate_prompt_params(
+def _validate_agent_params(
     prompt: str,
     params: SimpleParams,
     node_id: str,
@@ -141,7 +149,7 @@ def _validate_prompt_params(
         unique_missing = list(dict.fromkeys(missing_params))
         plural = "s" if len(unique_missing) > 1 else ""
         raise ValueError(
-            f'Missing parameter{plural} in prompt "{node_id}": {", ".join(unique_missing)}'
+            f'Missing parameter{plural} in agent "{node_id}": {", ".join(unique_missing)}'
         )
 
 
@@ -169,13 +177,13 @@ def insert_params_into_prompt(
     return result
 
 
-def traverse_prompt_node(
-    node: PromptNode,
-    callback: Callable[[PromptNode, Optional[str]], None],
+def traverse_agent_node(
+    node: AgentNode,
+    callback: Callable[[AgentNode, Optional[str]], None],
     parent_id: Optional[str] = None,
 ) -> None:
     """
-    Traverses a PromptNode tree and applies a callback to each node.
+    Traverses an AgentNode tree and applies a callback to each node.
 
     Args:
         node: The root node to start traversal from
@@ -184,51 +192,59 @@ def traverse_prompt_node(
     """
     callback(node, parent_id)
     for child in node["children"]:
-        traverse_prompt_node(child, callback, node["id"])
+        traverse_agent_node(child, callback, node["id"])
 
 
-def format_prompt_request(node: PromptNode) -> PromptRequest:
+def format_agent_request(node: AgentNode) -> AgentRequest:
     """
-    Formats a PromptNode into a PromptRequest suitable for the /prompts API.
+    Formats an AgentNode into an AgentRequest suitable for the /sync_agents API.
 
     Args:
-        node: The root PromptNode to format
+        node: The root AgentNode to format
 
     Returns:
-        The formatted PromptRequest
+        The formatted AgentRequest
     """
-    def format_node(n: PromptNode) -> PromptRequestItem:
+    def format_node(n: AgentNode) -> AgentRequestItem:
         param_keys = list(n["params"].keys()) + [child["id"] for child in n["children"]]
         return {
             "id": n["id"],
             "name": n.get("name"),
-            "version": n.get("version"),
+            "majorVersion": n.get("major_version"),
             "prompt": n["prompt"],
             "paramKeys": param_keys,
             "childrenIds": [child["id"] for child in n["children"]],
+            # Hyperparameters (using camelCase for API)
+            "model": n.get("model"),
+            "temperature": n.get("temperature"),
+            "maxTokens": n.get("max_tokens"),
+            "topP": n.get("top_p"),
+            "frequencyPenalty": n.get("frequency_penalty"),
+            "presencePenalty": n.get("presence_penalty"),
+            "stopSequences": n.get("stop_sequences"),
         }
 
-    prompt_map: Dict[str, PromptRequestItem] = {}
+    agent_map: Dict[str, AgentRequestItem] = {}
 
-    def add_to_map(current_node: PromptNode, parent_id: Optional[str]) -> None:
-        prompt_map[current_node["id"]] = format_node(current_node)
+    def add_to_map(current_node: AgentNode, parent_id: Optional[str]) -> None:
+        agent_map[current_node["id"]] = format_node(current_node)
 
-    traverse_prompt_node(node, add_to_map)
+    traverse_agent_node(node, add_to_map)
 
     return {
-        "prompts": {
+        "agents": {
             "rootId": node["id"],
-            "map": prompt_map,
+            "map": agent_map,
         }
     }
 
 
-def update_prompt_nodes(
-    root: PromptNode,
-    callback: Callable[[PromptNode], PromptNode],
-) -> PromptNode:
+def update_agent_nodes(
+    root: AgentNode,
+    callback: Callable[[AgentNode], AgentNode],
+) -> AgentNode:
     """
-    Updates all nodes in a PromptNode tree using a callback function.
+    Updates all nodes in an AgentNode tree using a callback function.
 
     Args:
         root: The root node of the tree
@@ -237,9 +253,29 @@ def update_prompt_nodes(
     Returns:
         The updated tree with all nodes transformed
     """
-    def update_node(node: PromptNode) -> PromptNode:
+    def update_node(node: AgentNode) -> AgentNode:
         updated_children = [update_node(child) for child in node["children"]]
-        updated_node: PromptNode = {**node, "children": updated_children}
+        updated_node: AgentNode = {**node, "children": updated_children}
         return callback(updated_node)
 
     return update_node(root)
+
+
+# ============================================================================
+# Backwards Compatibility Aliases (deprecated)
+# ============================================================================
+
+# Deprecated: Use get_agent_node instead
+get_prompt_node = get_agent_node
+
+# Deprecated: Use evaluate_agent instead
+evaluate_prompt = evaluate_agent
+
+# Deprecated: Use traverse_agent_node instead
+traverse_prompt_node = traverse_agent_node
+
+# Deprecated: Use format_agent_request instead
+format_prompt_request = format_agent_request
+
+# Deprecated: Use update_agent_nodes instead
+update_prompt_nodes = update_agent_nodes

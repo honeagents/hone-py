@@ -12,19 +12,19 @@ from typing import Any, Dict, List, Optional, TypeVar
 import httpx
 
 from .types import (
-    GetPromptOptions,
+    GetAgentOptions,
     HoneConfig,
     Message,
-    PromptRequest,
-    PromptResponse,
+    AgentRequest,
+    AgentResponse,
     TrackConversationOptions,
     TrackRequest,
 )
-from .prompt import (
-    evaluate_prompt,
-    format_prompt_request,
-    get_prompt_node,
-    update_prompt_nodes,
+from .agent import (
+    evaluate_agent,
+    format_agent_request,
+    get_agent_node,
+    update_agent_nodes,
 )
 
 DEFAULT_BASE_URL = "https://honeagents.ai/api"
@@ -43,7 +43,7 @@ class Hone:
     """
     The main Hone client for interacting with the Hone API.
 
-    Implements the HoneClient protocol with prompt() and track() methods.
+    Implements the HoneClient protocol with agent() and track() methods.
     """
 
     def __init__(self, config: HoneConfig) -> None:
@@ -121,41 +121,56 @@ class Hone:
                 f"Hone API request timed out after {self._timeout}ms"
             )
 
-    async def prompt(self, id: str, options: GetPromptOptions) -> str:
+    async def agent(self, id: str, options: GetAgentOptions) -> str:
         """
-        Fetches and evaluates a prompt by its ID with the given options.
+        Fetches and evaluates an agent by its ID with the given options.
 
         Args:
-            id: The unique identifier for the prompt.
-            options: Options for fetching and evaluating the prompt.
+            id: The unique identifier for the agent.
+            options: Options for fetching and evaluating the agent.
 
         Returns:
             The evaluated prompt string.
         """
-        node = get_prompt_node(id, options)
+        node = get_agent_node(id, options)
 
         try:
-            formatted_request = format_prompt_request(node)
-            new_prompt_map: PromptResponse = await self._make_request(
-                "/sync_prompts",
+            formatted_request = format_agent_request(node)
+            new_agent_map: AgentResponse = await self._make_request(
+                "/sync_agents",
                 "POST",
                 formatted_request,
             )
 
-            def update_with_remote(prompt_node: Dict[str, Any]) -> Dict[str, Any]:
-                remote_prompt = new_prompt_map.get(prompt_node["id"], {})
+            def update_with_remote(agent_node: Dict[str, Any]) -> Dict[str, Any]:
+                remote_agent = new_agent_map.get(agent_node["id"], {})
                 return {
-                    **prompt_node,
-                    "prompt": remote_prompt.get("prompt", prompt_node["prompt"]),
+                    **agent_node,
+                    "prompt": remote_agent.get("prompt", agent_node["prompt"]),
                 }
 
-            updated_prompt_node = update_prompt_nodes(node, update_with_remote)
+            updated_agent_node = update_agent_nodes(node, update_with_remote)
             # Params are inserted client-side for flexibility and security
-            return evaluate_prompt(updated_prompt_node)
+            return evaluate_agent(updated_agent_node)
 
         except Exception as error:
-            print(f"Error fetching prompt, using fallback: {error}")
-            return evaluate_prompt(node)
+            print(f"Error fetching agent, using fallback: {error}")
+            return evaluate_agent(node)
+
+    async def prompt(self, id: str, options: GetAgentOptions) -> str:
+        """
+        Deprecated: Use agent() instead.
+
+        Fetches and evaluates an agent by its ID with the given options.
+
+        Args:
+            id: The unique identifier for the agent.
+            options: Options for fetching and evaluating the agent.
+
+        Returns:
+            The evaluated prompt string.
+        """
+        return await self.agent(id, options)
 
     async def track(
         self,
