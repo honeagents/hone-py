@@ -12,7 +12,6 @@ from hone.client import Hone
 from .helpers import (
     TestDatabase,
     TestFixture,
-    Prompt,
     unique_prompt_id,
 )
 

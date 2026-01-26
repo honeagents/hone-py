@@ -6,7 +6,6 @@ Exact replica of TypeScript client.test.ts - tests the Hone client class.
 
 import json
 import os
-from unittest.mock import patch
 
 import httpx
 import pytest

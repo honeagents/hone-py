@@ -8,7 +8,7 @@ Exact replica of TypeScript tools.ts.
 """
 
 import json
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List
 
 from .types import Message, ToolCall
 

@@ -5,8 +5,6 @@ These tests verify that the providers, extractors, and normalizers work
 correctly together in realistic scenarios.
 """
 
-import pytest
-
 from hone import (
     # Provider constants
     AIProvider,
@@ -14,9 +12,6 @@ from hone import (
     is_valid_provider,
     get_provider_display_name,
     # Message extraction
-    extract_openai_messages,
-    extract_anthropic_messages,
-    extract_gemini_messages,
     from_openai,
     from_anthropic,
     from_gemini,
@@ -26,7 +21,6 @@ from hone import (
     normalize_gemini_contents,
     # Tool helpers
     create_tool_call_message,
-    create_tool_result_message,
     tool_result,
 )
 
