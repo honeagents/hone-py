@@ -42,6 +42,9 @@ class TestGetAgentNode:
             "frequency_penalty": None,
             "presence_penalty": None,
             "stop_sequences": None,
+            "type": "agent",
+            "provider": None,
+            "tools": None,
         }
 
     def test_should_create_agent_node_with_simple_string_parameters(self):
@@ -71,6 +74,9 @@ class TestGetAgentNode:
             "frequency_penalty": None,
             "presence_penalty": None,
             "stop_sequences": None,
+            "type": "agent",
+            "provider": None,
+            "tools": None,
         }
 
     def test_should_create_agent_node_with_major_version_and_name(self):
