@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "honeagents-hone"
-version = "0.1.0"
+version = "0.1.1"
 description = "Hone SDK - AI Experience Engineering Platform for tracking and improving LLM applications"
 readme = "README.md"
 license = "MIT"
