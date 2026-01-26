@@ -18,7 +18,6 @@ from .types import (
     GetTextPromptOptions,
     HoneConfig,
     Message,
-    EntityRequest,
     EntityResponse,
     ToolResult,
     TextPromptResult,

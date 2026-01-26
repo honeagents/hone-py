@@ -4,9 +4,6 @@ Unit tests for Hone SDK tools module.
 Exact replica of TypeScript tools.test.ts - tests tool tracking helpers and normalizers.
 """
 
-import json
-import pytest
-
 from hone.tools import (
     create_tool_call_message,
     create_tool_result_message,

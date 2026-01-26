@@ -4,8 +4,6 @@ Unit tests for Hone SDK providers module.
 Exact replica of TypeScript providers tests - tests AIProvider enum and helper functions.
 """
 
-import pytest
-
 from hone.providers import (
     AIProvider,
     AI_PROVIDER_VALUES,

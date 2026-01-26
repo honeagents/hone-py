@@ -6,7 +6,7 @@ evaluation, and formatting.
 """
 
 import re
-from typing import Callable, Dict, List, Literal, Optional, Set, Any, Union
+from typing import Callable, Dict, List, Optional, Set, Any, Union
 
 from .types import (
     GetAgentOptions,
