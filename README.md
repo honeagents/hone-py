@@ -1,20 +1,20 @@
 # Hone SDK (Python)
 
-**Last Updated:** 2026-01-22
+**Last Updated:** 2026-01-26
 
 Python SDK for the Hone AI Experience Engineering Platform.
 
 ## Installation
 
 ```bash
-pip install hone-sdk
+pip install honeagents-hone
 ```
 
 ## Quick Start
 
 ```python
 import asyncio
-from hone import create_hone_client
+from hone import create_hone_client, AIProvider
 
 async def main():
     # Initialize the client
@@ -23,7 +23,7 @@ async def main():
     # Fetch an agent with hyperparameters
     agent = await hone.agent("customer-support", {
         "model": "gpt-4o-mini",
-        "provider": "openai",
+        "provider": AIProvider.OPENAI,  # or just "openai"
         "temperature": 0.7,
         "default_prompt": "You are a helpful customer support agent.",
     })
@@ -44,11 +44,14 @@ asyncio.run(main())
 ## Features
 
 - **Agent management** with versioned prompts and hyperparameters
+- **Zero-friction tracking** - pass native provider formats directly, no conversion needed
 - **Tool management** with versioned tool descriptions
 - **Parameter substitution** with `{{variableName}}` syntax
 - **Nested entities** - agents can reference other agents, tools, or prompts
 - **Conversation tracking** with tool call support
 - **Tool tracking helpers** for OpenAI, Anthropic, and Google Gemini
+- **Input normalizers** for converting provider message formats
+- **Provider constants** with type-safe enum values (17 providers)
 - **Graceful fallback** to defaults on API errors
 
 ## API Reference
@@ -177,6 +180,84 @@ response = await model.generate_content(...)
 messages.extend(from_gemini(response.to_dict()))
 ```
 
+### Input Normalizers
+
+For normalizing input messages (not responses), use the normalizer functions:
+
+```python
+from hone import (
+    normalize_openai_messages,
+    normalize_anthropic_messages,
+    normalize_gemini_contents,
+)
+
+# Normalize OpenAI input messages
+openai_messages = [
+    {"role": "system", "content": "You are helpful."},
+    {"role": "user", "content": "Hello!"},
+]
+normalized = normalize_openai_messages(openai_messages)
+
+# Normalize Anthropic input messages
+anthropic_messages = [
+    {"role": "user", "content": "Hello!"},
+    {"role": "assistant", "content": [{"type": "text", "text": "Hi!"}]},
+]
+normalized = normalize_anthropic_messages(anthropic_messages)
+
+# Normalize Gemini contents
+gemini_contents = [
+    {"role": "user", "parts": [{"text": "Hello!"}]},
+    {"role": "model", "parts": [{"text": "Hi there!"}]},
+]
+normalized = normalize_gemini_contents(gemini_contents)
+```
+
+## Provider Constants
+
+Use type-safe provider constants:
+
+```python
+from hone import AIProvider, is_valid_provider, get_provider_display_name
+
+# Use enum values
+config = {
+    "provider": AIProvider.OPENAI,  # "openai"
+    "model": "gpt-4o",
+}
+
+# Validate provider strings
+user_input = "openai"
+if is_valid_provider(user_input):
+    print(f"Valid provider: {user_input}")
+
+# Get display names
+get_provider_display_name("openai")  # "OpenAI"
+get_provider_display_name("amazon-bedrock")  # "Amazon Bedrock"
+```
+
+### Supported Providers
+
+| Provider           | Value             | Display Name        |
+| ------------------ | ----------------- | ------------------- |
+| OpenAI             | `openai`          | OpenAI              |
+| Anthropic          | `anthropic`       | Anthropic           |
+| Google AI          | `google`          | Google AI           |
+| Google Vertex AI   | `google-vertex`   | Google Vertex AI    |
+| Azure OpenAI       | `azure`           | Azure OpenAI        |
+| xAI                | `xai`             | xAI                 |
+| Mistral AI         | `mistral`         | Mistral AI          |
+| Cohere             | `cohere`          | Cohere              |
+| Groq               | `groq`            | Groq                |
+| Together.ai        | `togetherai`      | Together.ai         |
+| Fireworks          | `fireworks`       | Fireworks           |
+| DeepInfra          | `deepinfra`       | DeepInfra           |
+| DeepSeek           | `deepseek`        | DeepSeek            |
+| Cerebras           | `cerebras`        | Cerebras            |
+| Perplexity         | `perplexity`      | Perplexity          |
+| Amazon Bedrock     | `amazon-bedrock`  | Amazon Bedrock      |
+| Baseten            | `baseten`         | Baseten             |
+
 ## Nested Entities
 
 Agents can reference other prompts or agents:
@@ -231,6 +312,11 @@ from hone import (
     # Client types
     HoneClient,
     HoneConfig,
+
+    # Provider types
+    AIProvider,
+    AIProviderValue,
+    AI_PROVIDER_VALUES,
 
     # Agent types
     GetAgentOptions,

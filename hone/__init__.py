@@ -5,6 +5,13 @@ Public API exports matching TypeScript index.ts.
 """
 
 from .client import Hone, create_hone_client
+from .providers import (
+    AIProvider,
+    AIProviderValue,
+    AI_PROVIDER_VALUES,
+    is_valid_provider,
+    get_provider_display_name,
+)
 from .types import (
     # Config
     HoneConfig,
@@ -80,6 +87,10 @@ from .tools import (
     extract_openai_messages,
     extract_anthropic_messages,
     extract_gemini_messages,
+    # Input normalizers (for manual use)
+    normalize_openai_messages,
+    normalize_anthropic_messages,
+    normalize_gemini_contents,
     # Short aliases (recommended)
     tool_result,
     from_openai,
@@ -91,6 +102,12 @@ __all__ = [
     # Client
     "Hone",
     "create_hone_client",
+    # Providers
+    "AIProvider",
+    "AIProviderValue",
+    "AI_PROVIDER_VALUES",
+    "is_valid_provider",
+    "get_provider_display_name",
     # Config
     "HoneConfig",
     # Entity Types
@@ -147,6 +164,11 @@ __all__ = [
     "extract_openai_messages",
     "extract_anthropic_messages",
     "extract_gemini_messages",
+    # Input normalizers
+    "normalize_openai_messages",
+    "normalize_anthropic_messages",
+    "normalize_gemini_contents",
+    # Short aliases
     "tool_result",
     "from_openai",
     "from_anthropic",

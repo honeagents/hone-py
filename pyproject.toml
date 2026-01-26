@@ -3,14 +3,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "hone-sdk"
+name = "honeagents-hone"
 version = "0.1.0"
 description = "Hone SDK - AI Experience Engineering Platform for tracking and improving LLM applications"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.9"
+requires-python = ">=3.8"
 authors = [
-    { name = "Hone Team" }
+    { name = "Hone Team", email = "team@honeagents.ai" }
 ]
 keywords = [
     "ai",
@@ -28,10 +28,12 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
@@ -50,8 +52,9 @@ dev = [
 
 [project.urls]
 Homepage = "https://honeagents.ai"
-Repository = "https://github.com/stone-pebble/hone-sdk"
-Issues = "https://github.com/stone-pebble/hone-sdk/issues"
+Documentation = "https://honeagents.ai/docs"
+Repository = "https://github.com/honeagents/hone-py"
+Issues = "https://github.com/honeagents/hone-py/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["hone"]
@@ -62,11 +65,11 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.8"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py38"

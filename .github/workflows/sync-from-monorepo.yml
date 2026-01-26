@@ -1,0 +1,21 @@
+name: Sync from Monorepo
+
+# This workflow is triggered by the monorepo when sdk/python changes
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Commit SHA from monorepo'
+        required: false
+        type: string
+
+jobs:
+  # This is a placeholder - the actual sync happens via git subtree push
+  # from the monorepo, not from this repo
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log sync trigger
+        run: |
+          echo "Sync triggered from monorepo"
+          echo "Commit: ${{ github.event.inputs.commit_sha }}"

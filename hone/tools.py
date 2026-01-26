@@ -248,6 +248,234 @@ def extract_gemini_messages(response: Dict[str, Any]) -> List[Message]:
 
 
 # =============================================================================
+# Input Message Normalizers (for zero-friction tracking)
+# =============================================================================
+
+
+def normalize_openai_messages(messages: List[Dict[str, Any]]) -> List[Message]:
+    """
+    Normalizes OpenAI input messages to Hone's Message format.
+
+    Args:
+        messages: Array of OpenAI ChatCompletionMessageParam
+
+    Returns:
+        Array of normalized Message objects
+
+    Example:
+        >>> messages = [
+        ...     {"role": "system", "content": "You are helpful."},
+        ...     {"role": "user", "content": "Hello!"},
+        ... ]
+        >>> normalized = normalize_openai_messages(messages)
+    """
+    result: List[Message] = []
+
+    for m in messages:
+        role = m.get("role", "")
+
+        # Handle system, user, assistant messages
+        if role in ("system", "user", "assistant"):
+            content = m.get("content", "")
+
+            # Handle content that might be an array of content blocks
+            if isinstance(content, list):
+                text_parts = []
+                for c in content:
+                    if isinstance(c, dict) and c.get("type") == "text":
+                        text_parts.append(c.get("text", ""))
+                content = "\n".join(text_parts)
+            elif content is None:
+                content = ""
+
+            message: Message = {
+                "role": role,
+                "content": content,
+            }
+
+            # Handle tool calls on assistant messages
+            if role == "assistant" and "tool_calls" in m and m["tool_calls"]:
+                tool_calls = m["tool_calls"]
+                message["tool_calls"] = [
+                    {
+                        "id": tc.get("id", ""),
+                        "name": tc.get("function", {}).get("name", ""),
+                        "arguments": tc.get("function", {}).get("arguments", "{}"),
+                    }
+                    for tc in tool_calls
+                    if tc.get("type") == "function"
+                ]
+
+            result.append(message)
+
+        elif role == "tool":
+            content = m.get("content", "")
+            if not isinstance(content, str):
+                content = ""
+            result.append({
+                "role": "tool",
+                "content": content,
+                "tool_call_id": m.get("tool_call_id", ""),
+            })
+
+    return result
+
+
+def normalize_anthropic_messages(messages: List[Dict[str, Any]]) -> List[Message]:
+    """
+    Normalizes Anthropic input messages to Hone's Message format.
+    Note: System prompt should be passed separately to track().
+
+    Args:
+        messages: Array of Anthropic MessageParam
+
+    Returns:
+        Array of normalized Message objects
+
+    Example:
+        >>> messages = [
+        ...     {"role": "user", "content": "Hello!"},
+        ...     {"role": "assistant", "content": [{"type": "text", "text": "Hi!"}]},
+        ... ]
+        >>> normalized = normalize_anthropic_messages(messages)
+    """
+    result: List[Message] = []
+
+    for m in messages:
+        content = m.get("content", "")
+        role = m.get("role", "user")
+
+        if isinstance(content, str):
+            result.append({
+                "role": role,
+                "content": content,
+            })
+        elif isinstance(content, list):
+            # Handle content blocks
+            text_parts: List[str] = []
+            tool_calls: List[ToolCall] = []
+            tool_results: List[Dict[str, str]] = []
+
+            for block in content:
+                block_type = block.get("type", "")
+
+                if block_type == "text":
+                    text_parts.append(block.get("text", ""))
+                elif block_type == "tool_use":
+                    tool_calls.append({
+                        "id": block.get("id", ""),
+                        "name": block.get("name", ""),
+                        "arguments": json.dumps(block.get("input", {})),
+                    })
+                elif block_type == "tool_result":
+                    block_content = block.get("content", "")
+                    if isinstance(block_content, list):
+                        # Extract text from content blocks
+                        text_content = "\n".join(
+                            c.get("text", "")
+                            for c in block_content
+                            if isinstance(c, dict) and c.get("type") == "text"
+                        )
+                        block_content = text_content
+                    elif not isinstance(block_content, str):
+                        block_content = ""
+                    tool_results.append({
+                        "tool_use_id": block.get("tool_use_id", ""),
+                        "content": block_content,
+                    })
+
+            # Add text/tool_calls as assistant or user message
+            if text_parts or tool_calls:
+                message: Message = {
+                    "role": role,
+                    "content": "\n".join(text_parts),
+                }
+                if tool_calls:
+                    message["tool_calls"] = tool_calls
+                result.append(message)
+
+            # Add tool results as separate tool messages
+            for tr in tool_results:
+                result.append({
+                    "role": "tool",
+                    "content": tr["content"],
+                    "tool_call_id": tr["tool_use_id"],
+                })
+
+    return result
+
+
+def normalize_gemini_contents(contents: List[Dict[str, Any]]) -> List[Message]:
+    """
+    Normalizes Gemini input contents to Hone's Message format.
+    Note: System instruction should be passed separately to track().
+
+    Args:
+        contents: Array of Gemini Content
+
+    Returns:
+        Array of normalized Message objects
+
+    Example:
+        >>> contents = [
+        ...     {"role": "user", "parts": [{"text": "Hello!"}]},
+        ...     {"role": "model", "parts": [{"text": "Hi there!"}]},
+        ... ]
+        >>> normalized = normalize_gemini_contents(contents)
+    """
+    import time
+
+    result: List[Message] = []
+
+    for c in contents:
+        parts = c.get("parts", [])
+        role = c.get("role", "user")
+
+        text_parts: List[str] = []
+        tool_calls: List[ToolCall] = []
+        tool_results: List[Dict[str, str]] = []
+
+        for part in parts:
+            if "text" in part and part["text"]:
+                text_parts.append(part["text"])
+            elif "functionCall" in part and part["functionCall"]:
+                fc = part["functionCall"]
+                tool_calls.append({
+                    "id": f"gemini_{fc.get('name', 'unknown')}_{int(time.time() * 1000)}",
+                    "name": fc.get("name", ""),
+                    "arguments": json.dumps(fc.get("args", {})),
+                })
+            elif "functionResponse" in part and part["functionResponse"]:
+                fr = part["functionResponse"]
+                tool_results.append({
+                    "name": fr.get("name", ""),
+                    "content": json.dumps(fr.get("response", {})),
+                })
+
+        # Map Gemini's "model" role to "assistant"
+        mapped_role = "assistant" if role == "model" else "user"
+
+        if text_parts or tool_calls:
+            message: Message = {
+                "role": mapped_role,
+                "content": "\n".join(text_parts),
+            }
+            if tool_calls:
+                message["tool_calls"] = tool_calls
+            result.append(message)
+
+        # Add function responses as tool messages
+        for tr in tool_results:
+            result.append({
+                "role": "tool",
+                "content": tr["content"],
+                "tool_call_id": tr["name"],  # Gemini uses function name, not ID
+            })
+
+    return result
+
+
+# =============================================================================
 # Short Aliases (Recommended)
 # =============================================================================
 

@@ -1,0 +1,64 @@
+name: Publish to PyPI
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write  # Required for trusted publishing
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Run tests
+        run: |
+          pip install -e ".[dev]"
+          pytest tests/test_providers.py tests/test_tools.py -v
+
+      - name: Build package
+        run: python -m build
+
+      - name: Check if version changed
+        id: version-check
+        run: |
+          PACKAGE_VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          PYPI_VERSION=$(pip index versions honeagents-hone 2>/dev/null | grep -oP 'honeagents-hone \(\K[^)]+' || echo "0.0.0")
+          if [ "$PACKAGE_VERSION" = "$PYPI_VERSION" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Version $PACKAGE_VERSION already published, skipping"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "Publishing $PACKAGE_VERSION (PyPI has $PYPI_VERSION)"
+          fi
+
+      - name: Publish to PyPI
+        if: steps.version-check.outputs.skip != 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # No password needed - uses trusted publishing (OIDC)
+
+      - name: Create git tag
+        if: steps.version-check.outputs.skip != 'true'
+        run: |
+          VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
