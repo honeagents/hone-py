@@ -21,20 +21,6 @@ class TestAIProvider:
             "openai",
             "anthropic",
             "google",
-            "google-vertex",
-            "azure",
-            "xai",
-            "mistral",
-            "cohere",
-            "groq",
-            "togetherai",
-            "fireworks",
-            "deepinfra",
-            "deepseek",
-            "cerebras",
-            "perplexity",
-            "amazon-bedrock",
-            "baseten",
         ]
 
         for provider in expected_providers:
@@ -45,20 +31,6 @@ class TestAIProvider:
         assert AIProvider.OPENAI.value == "openai"
         assert AIProvider.ANTHROPIC.value == "anthropic"
         assert AIProvider.GOOGLE.value == "google"
-        assert AIProvider.GOOGLE_VERTEX.value == "google-vertex"
-        assert AIProvider.AZURE.value == "azure"
-        assert AIProvider.XAI.value == "xai"
-        assert AIProvider.MISTRAL.value == "mistral"
-        assert AIProvider.COHERE.value == "cohere"
-        assert AIProvider.GROQ.value == "groq"
-        assert AIProvider.TOGETHERAI.value == "togetherai"
-        assert AIProvider.FIREWORKS.value == "fireworks"
-        assert AIProvider.DEEPINFRA.value == "deepinfra"
-        assert AIProvider.DEEPSEEK.value == "deepseek"
-        assert AIProvider.CEREBRAS.value == "cerebras"
-        assert AIProvider.PERPLEXITY.value == "perplexity"
-        assert AIProvider.AMAZON_BEDROCK.value == "amazon-bedrock"
-        assert AIProvider.BASETEN.value == "baseten"
 
     def test_should_be_usable_as_string(self):
         """Provider enum values should be usable as strings."""
@@ -83,7 +55,6 @@ class TestIsValidProvider:
         assert is_valid_provider("openai") is True
         assert is_valid_provider("anthropic") is True
         assert is_valid_provider("google") is True
-        assert is_valid_provider("amazon-bedrock") is True
 
     def test_should_return_false_for_invalid_providers(self):
         """Should return False for invalid provider strings."""
@@ -106,20 +77,6 @@ class TestGetProviderDisplayName:
         assert get_provider_display_name("openai") == "OpenAI"
         assert get_provider_display_name("anthropic") == "Anthropic"
         assert get_provider_display_name("google") == "Google AI"
-        assert get_provider_display_name("google-vertex") == "Google Vertex AI"
-        assert get_provider_display_name("azure") == "Azure OpenAI"
-        assert get_provider_display_name("xai") == "xAI"
-        assert get_provider_display_name("mistral") == "Mistral AI"
-        assert get_provider_display_name("cohere") == "Cohere"
-        assert get_provider_display_name("groq") == "Groq"
-        assert get_provider_display_name("togetherai") == "Together.ai"
-        assert get_provider_display_name("fireworks") == "Fireworks"
-        assert get_provider_display_name("deepinfra") == "DeepInfra"
-        assert get_provider_display_name("deepseek") == "DeepSeek"
-        assert get_provider_display_name("cerebras") == "Cerebras"
-        assert get_provider_display_name("perplexity") == "Perplexity"
-        assert get_provider_display_name("amazon-bedrock") == "Amazon Bedrock"
-        assert get_provider_display_name("baseten") == "Baseten"
 
     def test_should_return_input_for_unknown_providers(self):
         """Should return the input string for unknown providers."""
@@ -129,7 +86,7 @@ class TestGetProviderDisplayName:
     def test_should_work_with_enum_values(self):
         """Should work when passed AIProvider enum values."""
         assert get_provider_display_name(AIProvider.OPENAI.value) == "OpenAI"
-        assert get_provider_display_name(AIProvider.AMAZON_BEDROCK.value) == "Amazon Bedrock"
+        assert get_provider_display_name(AIProvider.ANTHROPIC.value) == "Anthropic"
 
 
 class TestProviderImports:

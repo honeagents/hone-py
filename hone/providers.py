@@ -29,71 +29,22 @@ class AIProvider(str, Enum):
     """
 
     # =========================================================================
-    # Major LLM Providers
+    # Supported Providers
     # =========================================================================
 
-    # OpenAI - GPT models (gpt-4o, gpt-4, gpt-3.5-turbo, etc.)
+    # OpenAI - GPT models (gpt-4o, gpt-4o-mini, gpt-4-turbo, etc.)
     OPENAI = "openai"
 
     # Anthropic - Claude models (claude-3-opus, claude-3-sonnet, claude-3-haiku, etc.)
     ANTHROPIC = "anthropic"
 
-    # Google Generative AI - Gemini models (gemini-pro, gemini-1.5-pro, etc.)
+    # Google Generative AI - Gemini models (gemini-2.0-flash, gemini-1.5-pro, etc.)
     GOOGLE = "google"
 
-    # Google Vertex AI - Enterprise Gemini models
-    GOOGLE_VERTEX = "google-vertex"
-
-    # Azure OpenAI Service - Azure-hosted OpenAI models
-    AZURE = "azure"
-
     # =========================================================================
-    # Specialized Providers
+    # Future Providers
     # =========================================================================
-
-    # xAI - Grok models
-    XAI = "xai"
-
-    # Mistral AI - Mistral models (mistral-large, mistral-medium, etc.)
-    MISTRAL = "mistral"
-
-    # Cohere - Command models
-    COHERE = "cohere"
-
-    # =========================================================================
-    # Inference Providers
-    # =========================================================================
-
-    # Groq - Fast inference for open models
-    GROQ = "groq"
-
-    # Together.ai - Open model hosting
-    TOGETHERAI = "togetherai"
-
-    # Fireworks - Fast inference platform
-    FIREWORKS = "fireworks"
-
-    # DeepInfra - Model inference
-    DEEPINFRA = "deepinfra"
-
-    # DeepSeek - DeepSeek models
-    DEEPSEEK = "deepseek"
-
-    # Cerebras - Fast inference
-    CEREBRAS = "cerebras"
-
-    # Perplexity - Perplexity models with web search
-    PERPLEXITY = "perplexity"
-
-    # =========================================================================
-    # Cloud Providers
-    # =========================================================================
-
-    # Amazon Bedrock - AWS-hosted models
-    AMAZON_BEDROCK = "amazon-bedrock"
-
-    # Baseten - Model hosting platform
-    BASETEN = "baseten"
+    # Add new providers here as needed
 
 
 # Type alias for provider values (strings)
@@ -126,20 +77,6 @@ _PROVIDER_DISPLAY_NAMES = {
     "openai": "OpenAI",
     "anthropic": "Anthropic",
     "google": "Google AI",
-    "google-vertex": "Google Vertex AI",
-    "azure": "Azure OpenAI",
-    "xai": "xAI",
-    "mistral": "Mistral AI",
-    "cohere": "Cohere",
-    "groq": "Groq",
-    "togetherai": "Together.ai",
-    "fireworks": "Fireworks",
-    "deepinfra": "DeepInfra",
-    "deepseek": "DeepSeek",
-    "cerebras": "Cerebras",
-    "perplexity": "Perplexity",
-    "amazon-bedrock": "Amazon Bedrock",
-    "baseten": "Baseten",
 }
 
 
