@@ -271,6 +271,22 @@ class TestInsertParamsIntoPrompt:
         result = insert_params_into_prompt("Hello, {{name}}!", {"greeting": "Hi"})
         assert result == "Hello, {{name}}!"
 
+    def test_should_leave_unmatched_placeholders_unchanged_with_partial_params(self):
+        """Should only replace matched placeholders and leave unmatched ones as {{var}}."""
+        result = insert_params_into_prompt(
+            "{{greeting}}, {{name}}! Your role is {{role}}.",
+            {"greeting": "Hello"},
+        )
+        assert result == "Hello, {{name}}! Your role is {{role}}."
+
+    def test_should_leave_all_placeholders_unchanged_when_no_params_match(self):
+        """Should leave all placeholders unchanged when params has no matching keys."""
+        result = insert_params_into_prompt(
+            "{{agent_name}} uses {{model}} with {{provider}}",
+            {"unrelated_key": "value", "another_key": "other"},
+        )
+        assert result == "{{agent_name}} uses {{model}} with {{provider}}"
+
     def test_should_handle_prompts_with_no_placeholders(self):
         """Should handle prompts with no placeholders."""
         result = insert_params_into_prompt("Hello, World!", {"name": "Alice"})
