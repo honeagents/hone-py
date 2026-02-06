@@ -2,7 +2,7 @@
 Integration tests for the Hone SDK client.
 
 Exact replica of TypeScript sdk-client.integration.test.ts - tests verify
-the full SDK client works correctly with the sync_prompts RPC.
+the full SDK client works correctly with the sync_entities endpoint.
 """
 
 import pytest

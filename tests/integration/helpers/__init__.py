@@ -10,7 +10,6 @@ from .database import (
     Run,
     Session,
 )
-from .supabase_rpc import SupabaseRpc, RpcCallError
 from .fixtures import (
     TestFixture,
     create_test_fixture,
@@ -27,8 +26,6 @@ __all__ = [
     "Message",
     "Run",
     "Session",
-    "SupabaseRpc",
-    "RpcCallError",
     "TestFixture",
     "create_test_fixture",
     "cleanup_test_fixture",

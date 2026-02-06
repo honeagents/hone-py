@@ -50,14 +50,6 @@ from .types import (
     Params,
     ParamsValue,
     SimpleParams,
-    # Backwards compatibility
-    HonePrompt,
-    GetPromptOptions,
-    PromptNode,
-    PromptRequest,
-    PromptResponse,
-    AgentRequest,
-    AgentResponse,
 )
 from .agent import (
     # Entity functions
@@ -67,18 +59,11 @@ from .agent import (
     evaluate_agent,
     evaluate_entity,
     format_entity_request,
-    format_agent_request,
     update_agent_nodes,
     update_entity_nodes,
     traverse_agent_node,
     traverse_entity_node,
     insert_params_into_prompt,
-    # Backwards compatibility
-    get_prompt_node,
-    evaluate_prompt,
-    format_prompt_request,
-    update_prompt_nodes,
-    traverse_prompt_node,
 )
 from .tools import (
     # Tool tracking helpers
@@ -152,7 +137,6 @@ __all__ = [
     "evaluate_agent",
     "evaluate_entity",
     "format_entity_request",
-    "format_agent_request",
     "update_agent_nodes",
     "update_entity_nodes",
     "traverse_agent_node",
@@ -173,19 +157,6 @@ __all__ = [
     "from_openai",
     "from_anthropic",
     "from_gemini",
-    # Backwards compatibility
-    "HonePrompt",
-    "GetPromptOptions",
-    "PromptNode",
-    "PromptRequest",
-    "PromptResponse",
-    "AgentRequest",
-    "AgentResponse",
-    "get_prompt_node",
-    "evaluate_prompt",
-    "format_prompt_request",
-    "update_prompt_nodes",
-    "traverse_prompt_node",
 ]
 
 __version__ = "0.1.0"

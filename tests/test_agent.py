@@ -11,7 +11,7 @@ from hone.agent import (
     evaluate_agent,
     insert_params_into_prompt,
     traverse_agent_node,
-    format_agent_request,
+    format_entity_request,
     update_agent_nodes,
 )
 from hone.types import GetAgentOptions, AgentNode
@@ -565,13 +565,14 @@ class TestTraverseAgentNode:
         ]
 
 
-class TestFormatAgentRequest:
-    """Tests for format_agent_request function."""
+class TestFormatEntityRequest:
+    """Tests for format_entity_request function."""
 
     def test_should_format_simple_agent_node(self):
         """Should format a simple agent node."""
         node: AgentNode = {
             "id": "greeting",
+            "type": "agent",
             "name": "greeting-agent",
             "major_version": 1,
             "params": {"userName": "Alice"},
@@ -579,29 +580,24 @@ class TestFormatAgentRequest:
             "children": [],
         }
 
-        request = format_agent_request(node)
+        request = format_entity_request(node)
 
-        assert request["agents"]["rootId"] == "greeting"
-        assert request["agents"]["map"]["greeting"] == {
-            "id": "greeting",
-            "name": "greeting-agent",
-            "majorVersion": 1,
-            "prompt": "Hello, {{userName}}!",
-            "paramKeys": ["userName"],
-            "childrenIds": [],
-            "model": None,
-            "temperature": None,
-            "maxTokens": None,
-            "topP": None,
-            "frequencyPenalty": None,
-            "presencePenalty": None,
-            "stopSequences": None,
-        }
+        assert request["entities"]["rootId"] == "greeting"
+        assert request["entities"]["rootType"] == "agent"
+        assert request["entities"]["map"]["greeting"]["id"] == "greeting"
+        assert request["entities"]["map"]["greeting"]["type"] == "agent"
+        assert request["entities"]["map"]["greeting"]["name"] == "greeting-agent"
+        assert request["entities"]["map"]["greeting"]["majorVersion"] == 1
+        assert request["entities"]["map"]["greeting"]["prompt"] == "Hello, {{userName}}!"
+        assert request["entities"]["map"]["greeting"]["paramKeys"] == ["userName"]
+        assert request["entities"]["map"]["greeting"]["childrenIds"] == []
+        assert request["entities"]["map"]["greeting"]["childrenTypes"] == []
 
     def test_should_format_nested_agent_nodes(self):
         """Should format nested agent nodes."""
         node: AgentNode = {
             "id": "main",
+            "type": "agent",
             "name": None,
             "major_version": None,
             "params": {},
@@ -609,6 +605,7 @@ class TestFormatAgentRequest:
             "children": [
                 {
                     "id": "introduction",
+                    "type": "prompt",
                     "name": None,
                     "major_version": None,
                     "params": {"userName": "Bob"},
@@ -618,72 +615,60 @@ class TestFormatAgentRequest:
             ],
         }
 
-        request = format_agent_request(node)
+        request = format_entity_request(node)
 
-        assert request["agents"]["rootId"] == "main"
-        assert request["agents"]["map"]["main"] == {
-            "id": "main",
-            "name": None,
-            "majorVersion": None,
-            "prompt": "Intro: {{introduction}}",
-            "paramKeys": ["introduction"],
-            "childrenIds": ["introduction"],
-            "model": None,
-            "temperature": None,
-            "maxTokens": None,
-            "topP": None,
-            "frequencyPenalty": None,
-            "presencePenalty": None,
-            "stopSequences": None,
-        }
-        assert request["agents"]["map"]["introduction"] == {
-            "id": "introduction",
-            "name": None,
-            "majorVersion": None,
-            "prompt": "Hello, {{userName}}!",
-            "paramKeys": ["userName"],
-            "childrenIds": [],
-            "model": None,
-            "temperature": None,
-            "maxTokens": None,
-            "topP": None,
-            "frequencyPenalty": None,
-            "presencePenalty": None,
-            "stopSequences": None,
-        }
+        assert request["entities"]["rootId"] == "main"
+        assert request["entities"]["rootType"] == "agent"
+        assert request["entities"]["map"]["main"]["id"] == "main"
+        assert request["entities"]["map"]["main"]["type"] == "agent"
+        assert request["entities"]["map"]["main"]["prompt"] == "Intro: {{introduction}}"
+        assert request["entities"]["map"]["main"]["paramKeys"] == ["introduction"]
+        assert request["entities"]["map"]["main"]["childrenIds"] == ["introduction"]
+        assert request["entities"]["map"]["main"]["childrenTypes"] == ["prompt"]
+        assert request["entities"]["map"]["introduction"]["id"] == "introduction"
+        assert request["entities"]["map"]["introduction"]["type"] == "prompt"
+        assert request["entities"]["map"]["introduction"]["prompt"] == "Hello, {{userName}}!"
+        assert request["entities"]["map"]["introduction"]["paramKeys"] == ["userName"]
+        assert request["entities"]["map"]["introduction"]["childrenIds"] == []
 
     def test_should_format_agent_node_with_hyperparameters(self):
         """Should format agent node with hyperparameters."""
         node: AgentNode = {
             "id": "greeting",
+            "type": "agent",
             "name": None,
             "major_version": None,
             "params": {},
             "prompt": "Hello!",
             "children": [],
             "model": "gpt-4",
+            "provider": "openai",
             "temperature": 0.7,
             "max_tokens": 1000,
             "top_p": 0.9,
             "frequency_penalty": 0.5,
             "presence_penalty": 0.3,
             "stop_sequences": ["END"],
+            "tools": ["search"],
         }
 
-        request = format_agent_request(node)
+        request = format_entity_request(node)
 
-        assert request["agents"]["map"]["greeting"]["model"] == "gpt-4"
-        assert request["agents"]["map"]["greeting"]["temperature"] == 0.7
-        assert request["agents"]["map"]["greeting"]["maxTokens"] == 1000
-        assert request["agents"]["map"]["greeting"]["topP"] == 0.9
-        assert request["agents"]["map"]["greeting"]["frequencyPenalty"] == 0.5
-        assert request["agents"]["map"]["greeting"]["presencePenalty"] == 0.3
-        assert request["agents"]["map"]["greeting"]["stopSequences"] == ["END"]
+        assert request["entities"]["map"]["greeting"]["model"] == "gpt-4"
+        assert request["entities"]["map"]["greeting"]["provider"] == "openai"
+        assert request["entities"]["map"]["greeting"]["temperature"] == 0.7
+        assert request["entities"]["map"]["greeting"]["maxTokens"] == 1000
+        assert request["entities"]["map"]["greeting"]["topP"] == 0.9
+        assert request["entities"]["map"]["greeting"]["frequencyPenalty"] == 0.5
+        assert request["entities"]["map"]["greeting"]["presencePenalty"] == 0.3
+        assert request["entities"]["map"]["greeting"]["stopSequences"] == ["END"]
+        assert request["entities"]["map"]["greeting"]["tools"] == ["search"]
 
     def test_should_format_deeply_nested_structure(self):
         """Should format deeply nested structure."""
         node: AgentNode = {
             "id": "doc",
+            "type": "agent",
             "name": None,
             "major_version": None,
             "params": {},
@@ -691,6 +676,7 @@ class TestFormatAgentRequest:
             "children": [
                 {
                     "id": "section",
+                    "type": "prompt",
                     "name": None,
                     "major_version": None,
                     "params": {},
@@ -698,6 +684,7 @@ class TestFormatAgentRequest:
                     "children": [
                         {
                             "id": "paragraph",
+                            "type": "prompt",
                             "name": None,
                             "major_version": None,
                             "params": {"text": "content"},
@@ -709,18 +696,20 @@ class TestFormatAgentRequest:
             ],
         }
 
-        request = format_agent_request(node)
+        request = format_entity_request(node)
 
-        assert request["agents"]["rootId"] == "doc"
-        assert len(request["agents"]["map"]) == 3
-        assert request["agents"]["map"]["doc"]["childrenIds"] == ["section"]
-        assert request["agents"]["map"]["section"]["childrenIds"] == ["paragraph"]
-        assert request["agents"]["map"]["paragraph"]["paramKeys"] == ["text"]
+        assert request["entities"]["rootId"] == "doc"
+        assert request["entities"]["rootType"] == "agent"
+        assert len(request["entities"]["map"]) == 3
+        assert request["entities"]["map"]["doc"]["childrenIds"] == ["section"]
+        assert request["entities"]["map"]["section"]["childrenIds"] == ["paragraph"]
+        assert request["entities"]["map"]["paragraph"]["paramKeys"] == ["text"]
 
     def test_should_handle_multiple_children(self):
         """Should handle multiple children."""
         node: AgentNode = {
             "id": "document",
+            "type": "agent",
             "name": None,
             "major_version": None,
             "params": {},
@@ -728,6 +717,7 @@ class TestFormatAgentRequest:
             "children": [
                 {
                     "id": "header",
+                    "type": "prompt",
                     "name": None,
                     "major_version": None,
                     "params": {},
@@ -736,6 +726,7 @@ class TestFormatAgentRequest:
                 },
                 {
                     "id": "body",
+                    "type": "prompt",
                     "name": None,
                     "major_version": None,
                     "params": {"content": "text"},
@@ -744,6 +735,7 @@ class TestFormatAgentRequest:
                 },
                 {
                     "id": "footer",
+                    "type": "prompt",
                     "name": None,
                     "major_version": None,
                     "params": {},
@@ -753,14 +745,19 @@ class TestFormatAgentRequest:
             ],
         }
 
-        request = format_agent_request(node)
+        request = format_entity_request(node)
 
-        assert request["agents"]["map"]["document"]["childrenIds"] == [
+        assert request["entities"]["map"]["document"]["childrenIds"] == [
             "header",
             "body",
             "footer",
         ]
-        assert len(request["agents"]["map"]) == 4
+        assert request["entities"]["map"]["document"]["childrenTypes"] == [
+            "prompt",
+            "prompt",
+            "prompt",
+        ]
+        assert len(request["entities"]["map"]) == 4
 
 
 class TestUpdateAgentNodes:

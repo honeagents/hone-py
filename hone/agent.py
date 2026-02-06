@@ -365,49 +365,6 @@ def format_entity_request(node: EntityNode) -> EntityRequest:
     }
 
 
-def format_agent_request(node: EntityNode) -> Dict[str, Any]:
-    """
-    Formats an EntityNode into an AgentRequest suitable for the /sync_agents API.
-    DEPRECATED: Use format_entity_request instead.
-
-    Args:
-        node: The root EntityNode to format
-
-    Returns:
-        The formatted AgentRequest (old format)
-    """
-    def format_node(n: EntityNode) -> Dict[str, Any]:
-        param_keys = list(n["params"].keys()) + [child["id"] for child in n["children"]]
-        return {
-            "id": n["id"],
-            "name": n.get("name"),
-            "majorVersion": n.get("major_version"),
-            "prompt": n["prompt"],
-            "paramKeys": param_keys,
-            "childrenIds": [child["id"] for child in n["children"]],
-            # Hyperparameters (using camelCase for API)
-            "model": n.get("model"),
-            "temperature": n.get("temperature"),
-            "maxTokens": n.get("max_tokens"),
-            "topP": n.get("top_p"),
-            "frequencyPenalty": n.get("frequency_penalty"),
-            "presencePenalty": n.get("presence_penalty"),
-            "stopSequences": n.get("stop_sequences"),
-        }
-
-    agent_map: Dict[str, Any] = {}
-
-    def add_to_map(current_node: EntityNode, parent_id: Optional[str]) -> None:
-        agent_map[current_node["id"]] = format_node(current_node)
-
-    traverse_agent_node(node, add_to_map)
-
-    return {
-        "agents": {
-            "rootId": node["id"],
-            "map": agent_map,
-        }
-    }
 
 
 def update_entity_nodes(
@@ -443,31 +400,3 @@ def update_agent_nodes(
     return update_entity_nodes(root, callback)
 
 
-# ============================================================================
-# Backwards Compatibility Aliases (deprecated)
-# ============================================================================
-
-# Deprecated validation function alias
-def _validate_agent_params(
-    prompt: str,
-    params: SimpleParams,
-    node_id: str,
-) -> None:
-    """DEPRECATED: Use _validate_entity_params instead."""
-    _validate_entity_params(prompt, params, node_id)
-
-
-# Deprecated: Use get_agent_node instead
-get_prompt_node = get_agent_node
-
-# Deprecated: Use evaluate_agent instead
-evaluate_prompt = evaluate_agent
-
-# Deprecated: Use traverse_agent_node instead
-traverse_prompt_node = traverse_agent_node
-
-# Deprecated: Use format_agent_request instead
-format_prompt_request = format_agent_request
-
-# Deprecated: Use update_agent_nodes instead
-update_prompt_nodes = update_agent_nodes
