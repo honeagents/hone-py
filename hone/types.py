@@ -156,8 +156,7 @@ class GetTextPromptOptions(TypedDict, total=False):
 
 class TextPromptResult(TypedDict):
     """
-    The result returned by hone.prompt().
-    Contains the evaluated text with parameters substituted.
+    @deprecated Use str directly - hone.prompt() now returns str.
     """
     text: str  # The fully evaluated text with all parameters substituted
 
@@ -293,7 +292,7 @@ class EntityV2Response(TypedDict):
 
 HoneAgent = Callable[[str, GetAgentOptions], Coroutine[Any, Any, AgentResult]]
 HoneTool = Callable[[str, GetToolOptions], Coroutine[Any, Any, ToolResult]]
-HoneTextPrompt = Callable[[str, GetTextPromptOptions], Coroutine[Any, Any, TextPromptResult]]
+HoneTextPrompt = Callable[[str, GetTextPromptOptions], Coroutine[Any, Any, str]]
 HoneTrack = Callable[[str, List[Message], TrackConversationOptions], Coroutine[Any, Any, None]]
 
 
@@ -333,7 +332,7 @@ class HoneClient(Protocol):
         """
         ...
 
-    async def prompt(self, id: str, options: GetTextPromptOptions) -> TextPromptResult:
+    async def prompt(self, id: str, options: GetTextPromptOptions) -> str:
         """
         Fetches and evaluates a text prompt by its ID with the given options.
 
@@ -342,7 +341,7 @@ class HoneClient(Protocol):
             options: Options for fetching and evaluating the prompt.
 
         Returns:
-            A TextPromptResult containing the evaluated text.
+            The evaluated text string.
         """
         ...
 

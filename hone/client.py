@@ -20,7 +20,6 @@ from .types import (
     Message,
     EntityV2Response,
     ToolResult,
-    TextPromptResult,
     TrackConversationOptions,
     TrackRequest,
 )
@@ -200,7 +199,7 @@ class Hone:
             "prompt": response["evaluatedPrompt"],
         }
 
-    async def prompt(self, id: str, options: GetTextPromptOptions) -> TextPromptResult:
+    async def prompt(self, id: str, options: GetTextPromptOptions) -> str:
         """
         Fetches and evaluates a text prompt by its ID with the given options.
 
@@ -209,7 +208,7 @@ class Hone:
             options: Options for fetching and evaluating the prompt.
 
         Returns:
-            A TextPromptResult containing the evaluated text.
+            The evaluated text string.
         """
         node = get_text_prompt_node(id, options)
 
@@ -223,10 +222,8 @@ class Hone:
             request,
         )
 
-        # Response includes evaluated prompt - no client-side evaluation needed
-        return {
-            "text": response["evaluatedPrompt"],
-        }
+        # Return the evaluated text directly
+        return response["evaluatedPrompt"]
 
     async def track(
         self,

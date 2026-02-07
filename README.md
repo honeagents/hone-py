@@ -103,16 +103,16 @@ tool = await hone.tool("get_weather", {
 print(tool["prompt"])  # The evaluated tool description
 ```
 
-### `hone.prompt(id, options) -> TextPromptResult`
+### `hone.prompt(id, options) -> str`
 
-Fetches and evaluates a text prompt by its ID.
+Fetches and evaluates a text prompt by its ID. Returns the evaluated text directly as a string.
 
 ```python
-prompt = await hone.prompt("tone-guidelines", {
+text = await hone.prompt("tone-guidelines", {
     "default_prompt": "Always be friendly and professional.",
 })
 
-print(prompt["text"])  # The evaluated text
+print(text)  # The evaluated text directly
 ```
 
 ### `hone.track(id, messages, options)`
@@ -315,7 +315,7 @@ from hone import (
 
     # Prompt types
     GetTextPromptOptions,
-    TextPromptResult,
+    # Note: hone.prompt() returns str directly (not TextPromptResult)
 
     # Tracking types
     Message,
