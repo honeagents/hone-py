@@ -41,11 +41,11 @@ from .types import (
     AgentNode,
     ToolNode,
     TextPromptNode,
-    # Request/Response Types
-    EntityRequest,
-    EntityResponse,
-    EntityRequestItem,
-    EntityResponseItem,
+    # V2 Request/Response Types
+    EntityV2Request,
+    EntityV2Response,
+    EntityV2RequestData,
+    EntityV2ResponseData,
     # Params Types
     Params,
     ParamsValue,
@@ -56,14 +56,9 @@ from .agent import (
     get_agent_node,
     get_tool_node,
     get_text_prompt_node,
-    evaluate_agent,
-    evaluate_entity,
-    format_entity_request,
+    format_entity_v2_request,
     update_agent_nodes,
     update_entity_nodes,
-    traverse_agent_node,
-    traverse_entity_node,
-    insert_params_into_prompt,
 )
 from .tools import (
     # Tool tracking helpers
@@ -121,11 +116,11 @@ __all__ = [
     "AgentNode",
     "ToolNode",
     "TextPromptNode",
-    # Request/Response Types
-    "EntityRequest",
-    "EntityResponse",
-    "EntityRequestItem",
-    "EntityResponseItem",
+    # V2 Request/Response Types
+    "EntityV2Request",
+    "EntityV2Response",
+    "EntityV2RequestData",
+    "EntityV2ResponseData",
     # Params Types
     "Params",
     "ParamsValue",
@@ -134,14 +129,9 @@ __all__ = [
     "get_agent_node",
     "get_tool_node",
     "get_text_prompt_node",
-    "evaluate_agent",
-    "evaluate_entity",
-    "format_entity_request",
+    "format_entity_v2_request",
     "update_agent_nodes",
     "update_entity_nodes",
-    "traverse_agent_node",
-    "traverse_entity_node",
-    "insert_params_into_prompt",
     # Tool tracking helpers
     "create_tool_call_message",
     "create_tool_result_message",

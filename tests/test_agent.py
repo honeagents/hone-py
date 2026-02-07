@@ -1,20 +1,18 @@
 """
 Unit tests for Hone SDK agent utilities.
 
-Exact replica of TypeScript agent.test.ts - tests all agent utility functions.
+Matches TypeScript agent.test.ts - tests agent utility functions for V2 API.
+Note: Parameter validation and evaluation is now handled server-side by the V2 API.
 """
 
 import pytest
 
 from hone.agent import (
     get_agent_node,
-    evaluate_agent,
-    insert_params_into_prompt,
-    traverse_agent_node,
-    format_entity_request,
+    format_entity_v2_request,
     update_agent_nodes,
 )
-from hone.types import GetAgentOptions, AgentNode
+from hone.types import GetAgentOptions, AgentNode, EntityNode
 
 
 class TestGetAgentNode:
@@ -28,24 +26,11 @@ class TestGetAgentNode:
 
         node = get_agent_node("greeting", options)
 
-        assert node == {
-            "id": "greeting",
-            "major_version": None,
-            "name": None,
-            "params": {},
-            "prompt": "Hello, World!",
-            "children": [],
-            "model": None,
-            "temperature": None,
-            "max_tokens": None,
-            "top_p": None,
-            "frequency_penalty": None,
-            "presence_penalty": None,
-            "stop_sequences": None,
-            "type": "agent",
-            "provider": None,
-            "tools": None,
-        }
+        assert node["id"] == "greeting"
+        assert node["type"] == "agent"
+        assert node["params"] == {}
+        assert node["prompt"] == "Hello, World!"
+        assert node["children"] == []
 
     def test_should_create_agent_node_with_simple_string_parameters(self):
         """Should create an agent node with simple string parameters."""
@@ -58,26 +43,8 @@ class TestGetAgentNode:
 
         node = get_agent_node("greeting", options)
 
-        assert node == {
-            "id": "greeting",
-            "major_version": None,
-            "name": None,
-            "params": {
-                "userName": "Alice",
-            },
-            "prompt": "Hello, {{userName}}!",
-            "children": [],
-            "model": None,
-            "temperature": None,
-            "max_tokens": None,
-            "top_p": None,
-            "frequency_penalty": None,
-            "presence_penalty": None,
-            "stop_sequences": None,
-            "type": "agent",
-            "provider": None,
-            "tools": None,
-        }
+        assert node["params"] == {"userName": "Alice"}
+        assert node["prompt"] == "Hello, {{userName}}!"
 
     def test_should_create_agent_node_with_major_version_and_name(self):
         """Should create an agent node with majorVersion and name."""
@@ -97,6 +64,7 @@ class TestGetAgentNode:
         options: GetAgentOptions = {
             "default_prompt": "Hello!",
             "model": "gpt-4",
+            "provider": "openai",
             "temperature": 0.7,
             "max_tokens": 1000,
             "top_p": 0.9,
@@ -108,6 +76,7 @@ class TestGetAgentNode:
         node = get_agent_node("greeting", options)
 
         assert node["model"] == "gpt-4"
+        assert node["provider"] == "openai"
         assert node["temperature"] == 0.7
         assert node["max_tokens"] == 1000
         assert node["top_p"] == 0.9
@@ -194,570 +163,9 @@ class TestGetAgentNode:
         with pytest.raises(ValueError):
             get_agent_node("a", options)
 
-    def test_should_throw_error_when_agent_has_placeholders_without_matching_parameters(self):
-        """Should throw an error when agent has placeholders without matching parameters."""
-        options: GetAgentOptions = {
-            "default_prompt": "Hello {{name}}, your role is {{role}}",
-            "params": {
-                "name": "Alice",
-                # 'role' is missing
-            },
-        }
 
-        node = get_agent_node("greeting", options)
-
-        # Should throw when evaluating because 'role' placeholder has no value
-        with pytest.raises(ValueError, match=r"(?i)missing parameter.*role"):
-            evaluate_agent(node)
-
-    def test_should_throw_error_listing_all_missing_parameters(self):
-        """Should throw an error listing all missing parameters."""
-        options: GetAgentOptions = {
-            "default_prompt": "{{greeting}} {{name}}, you are {{role}} in {{location}}",
-            "params": {
-                "name": "Bob",
-                # Missing: greeting, role, location
-            },
-        }
-
-        node = get_agent_node("test", options)
-
-        with pytest.raises(ValueError, match=r"(?i)missing parameter"):
-            evaluate_agent(node)
-
-
-class TestInsertParamsIntoPrompt:
-    """Tests for insert_params_into_prompt function."""
-
-    def test_should_replace_single_placeholder(self):
-        """Should replace single placeholder."""
-        result = insert_params_into_prompt("Hello, {{name}}!", {"name": "Alice"})
-        assert result == "Hello, Alice!"
-
-    def test_should_replace_multiple_placeholders(self):
-        """Should replace multiple placeholders."""
-        result = insert_params_into_prompt(
-            "{{greeting}} {{name}}, {{action}}!",
-            {
-                "greeting": "Hello",
-                "name": "Bob",
-                "action": "welcome",
-            },
-        )
-        assert result == "Hello Bob, welcome!"
-
-    def test_should_replace_multiple_occurrences_of_same_placeholder(self):
-        """Should replace multiple occurrences of the same placeholder."""
-        result = insert_params_into_prompt(
-            "{{name}} said: 'Hello {{name}}'",
-            {"name": "Charlie"},
-        )
-        assert result == "Charlie said: 'Hello Charlie'"
-
-    def test_should_return_original_prompt_when_no_params_provided(self):
-        """Should return original prompt when no params provided."""
-        prompt = "Hello, {{name}}!"
-        result = insert_params_into_prompt(prompt)
-        assert result == prompt
-
-    def test_should_handle_empty_params_object(self):
-        """Should handle empty params object."""
-        prompt = "Hello, {{name}}!"
-        result = insert_params_into_prompt(prompt, {})
-        assert result == prompt
-
-    def test_should_not_replace_placeholders_with_no_matching_params(self):
-        """Should not replace placeholders with no matching params."""
-        result = insert_params_into_prompt("Hello, {{name}}!", {"greeting": "Hi"})
-        assert result == "Hello, {{name}}!"
-
-    def test_should_leave_unmatched_placeholders_unchanged_with_partial_params(self):
-        """Should only replace matched placeholders and leave unmatched ones as {{var}}."""
-        result = insert_params_into_prompt(
-            "{{greeting}}, {{name}}! Your role is {{role}}.",
-            {"greeting": "Hello"},
-        )
-        assert result == "Hello, {{name}}! Your role is {{role}}."
-
-    def test_should_leave_all_placeholders_unchanged_when_no_params_match(self):
-        """Should leave all placeholders unchanged when params has no matching keys."""
-        result = insert_params_into_prompt(
-            "{{agent_name}} uses {{model}} with {{provider}}",
-            {"unrelated_key": "value", "another_key": "other"},
-        )
-        assert result == "{{agent_name}} uses {{model}} with {{provider}}"
-
-    def test_should_handle_prompts_with_no_placeholders(self):
-        """Should handle prompts with no placeholders."""
-        result = insert_params_into_prompt("Hello, World!", {"name": "Alice"})
-        assert result == "Hello, World!"
-
-    def test_should_handle_special_characters_in_values(self):
-        """Should handle special characters in values."""
-        result = insert_params_into_prompt(
-            "Message: {{text}}",
-            {"text": "Special chars: $, *, (, )"},
-        )
-        assert result == "Message: Special chars: $, *, (, )"
-
-
-class TestEvaluateAgent:
-    """Tests for evaluate_agent function."""
-
-    def test_should_evaluate_simple_agent_with_params(self):
-        """Should evaluate a simple agent with params."""
-        node: AgentNode = {
-            "id": "greeting",
-            "name": None,
-            "major_version": None,
-            "params": {"userName": "Alice"},
-            "prompt": "Hello, {{userName}}!",
-            "children": [],
-        }
-
-        result = evaluate_agent(node)
-        assert result == "Hello, Alice!"
-
-    def test_should_evaluate_nested_agents_depth_first(self):
-        """Should evaluate nested agents depth-first."""
-        node: AgentNode = {
-            "id": "main",
-            "name": None,
-            "major_version": None,
-            "params": {},
-            "prompt": "Intro: {{introduction}}",
-            "children": [
-                {
-                    "id": "introduction",
-                    "name": None,
-                    "major_version": None,
-                    "params": {"userName": "Bob"},
-                    "prompt": "Hello, {{userName}}!",
-                    "children": [],
-                },
-            ],
-        }
-
-        result = evaluate_agent(node)
-        assert result == "Intro: Hello, Bob!"
-
-    def test_should_evaluate_multiple_levels_of_nesting(self):
-        """Should evaluate multiple levels of nesting."""
-        node: AgentNode = {
-            "id": "main",
-            "name": None,
-            "major_version": None,
-            "params": {},
-            "prompt": "Doc: {{section}}",
-            "children": [
-                {
-                    "id": "section",
-                    "name": None,
-                    "major_version": None,
-                    "params": {},
-                    "prompt": "Section: {{paragraph}}",
-                    "children": [
-                        {
-                            "id": "paragraph",
-                            "name": None,
-                            "major_version": None,
-                            "params": {"text": "content"},
-                            "prompt": "Para: {{text}}",
-                            "children": [],
-                        },
-                    ],
-                },
-            ],
-        }
-
-        result = evaluate_agent(node)
-        assert result == "Doc: Section: Para: content"
-
-    def test_should_handle_multiple_children(self):
-        """Should handle multiple children."""
-        node: AgentNode = {
-            "id": "document",
-            "name": None,
-            "major_version": None,
-            "params": {},
-            "prompt": "{{header}}\n{{body}}\n{{footer}}",
-            "children": [
-                {
-                    "id": "header",
-                    "name": None,
-                    "major_version": None,
-                    "params": {},
-                    "prompt": "HEADER",
-                    "children": [],
-                },
-                {
-                    "id": "body",
-                    "name": None,
-                    "major_version": None,
-                    "params": {"content": "text"},
-                    "prompt": "Body: {{content}}",
-                    "children": [],
-                },
-                {
-                    "id": "footer",
-                    "name": None,
-                    "major_version": None,
-                    "params": {},
-                    "prompt": "FOOTER",
-                    "children": [],
-                },
-            ],
-        }
-
-        result = evaluate_agent(node)
-        assert result == "HEADER\nBody: text\nFOOTER"
-
-    def test_should_handle_agent_with_no_children_or_params(self):
-        """Should handle agent with no children or params."""
-        node: AgentNode = {
-            "id": "simple",
-            "name": None,
-            "major_version": None,
-            "params": {},
-            "prompt": "Static text",
-            "children": [],
-        }
-
-        result = evaluate_agent(node)
-        assert result == "Static text"
-
-    def test_should_cache_evaluated_nodes(self):
-        """Should cache evaluated nodes to avoid recomputation."""
-        shared_child: AgentNode = {
-            "id": "shared",
-            "name": None,
-            "major_version": None,
-            "params": {},
-            "prompt": "Shared",
-            "children": [],
-        }
-
-        node: AgentNode = {
-            "id": "main",
-            "name": None,
-            "major_version": None,
-            "params": {},
-            "prompt": "{{shared}}",
-            "children": [shared_child],
-        }
-
-        result = evaluate_agent(node)
-        assert result == "Shared"
-
-
-class TestTraverseAgentNode:
-    """Tests for traverse_agent_node function."""
-
-    def test_should_visit_single_node(self):
-        """Should visit single node."""
-        node: AgentNode = {
-            "id": "root",
-            "name": None,
-            "major_version": None,
-            "params": {},
-            "prompt": "test",
-            "children": [],
-        }
-
-        visited = []
-        traverse_agent_node(
-            node,
-            lambda n, parent_id: visited.append({"id": n["id"], "parent_id": parent_id}),
-        )
-
-        assert visited == [{"id": "root", "parent_id": None}]
-
-    def test_should_visit_nodes_in_depth_first_order(self):
-        """Should visit nodes in depth-first order."""
-        node: AgentNode = {
-            "id": "root",
-            "name": None,
-            "major_version": None,
-            "params": {},
-            "prompt": "test",
-            "children": [
-                {
-                    "id": "child1",
-                    "name": None,
-                    "major_version": None,
-                    "params": {},
-                    "prompt": "test",
-                    "children": [
-                        {
-                            "id": "grandchild1",
-                            "name": None,
-                            "major_version": None,
-                            "params": {},
-                            "prompt": "test",
-                            "children": [],
-                        },
-                    ],
-                },
-                {
-                    "id": "child2",
-                    "name": None,
-                    "major_version": None,
-                    "params": {},
-                    "prompt": "test",
-                    "children": [],
-                },
-            ],
-        }
-
-        visited = []
-        traverse_agent_node(node, lambda n, _: visited.append(n["id"]))
-
-        assert visited == ["root", "child1", "grandchild1", "child2"]
-
-    def test_should_pass_correct_parent_id_to_callback(self):
-        """Should pass correct parent ID to callback."""
-        node: AgentNode = {
-            "id": "root",
-            "name": None,
-            "major_version": None,
-            "params": {},
-            "prompt": "test",
-            "children": [
-                {
-                    "id": "child1",
-                    "name": None,
-                    "major_version": None,
-                    "params": {},
-                    "prompt": "test",
-                    "children": [
-                        {
-                            "id": "grandchild1",
-                            "name": None,
-                            "major_version": None,
-                            "params": {},
-                            "prompt": "test",
-                            "children": [],
-                        },
-                    ],
-                },
-                {
-                    "id": "child2",
-                    "name": None,
-                    "major_version": None,
-                    "params": {},
-                    "prompt": "test",
-                    "children": [],
-                },
-            ],
-        }
-
-        relationships = []
-        traverse_agent_node(
-            node,
-            lambda n, parent_id: relationships.append({"id": n["id"], "parent_id": parent_id}),
-        )
-
-        assert relationships == [
-            {"id": "root", "parent_id": None},
-            {"id": "child1", "parent_id": "root"},
-            {"id": "grandchild1", "parent_id": "child1"},
-            {"id": "child2", "parent_id": "root"},
-        ]
-
-
-class TestFormatEntityRequest:
-    """Tests for format_entity_request function."""
-
-    def test_should_format_simple_agent_node(self):
-        """Should format a simple agent node."""
-        node: AgentNode = {
-            "id": "greeting",
-            "type": "agent",
-            "name": "greeting-agent",
-            "major_version": 1,
-            "params": {"userName": "Alice"},
-            "prompt": "Hello, {{userName}}!",
-            "children": [],
-        }
-
-        request = format_entity_request(node)
-
-        assert request["entities"]["rootId"] == "greeting"
-        assert request["entities"]["rootType"] == "agent"
-        assert request["entities"]["map"]["greeting"]["id"] == "greeting"
-        assert request["entities"]["map"]["greeting"]["type"] == "agent"
-        assert request["entities"]["map"]["greeting"]["name"] == "greeting-agent"
-        assert request["entities"]["map"]["greeting"]["majorVersion"] == 1
-        assert request["entities"]["map"]["greeting"]["prompt"] == "Hello, {{userName}}!"
-        assert request["entities"]["map"]["greeting"]["paramKeys"] == ["userName"]
-        assert request["entities"]["map"]["greeting"]["childrenIds"] == []
-        assert request["entities"]["map"]["greeting"]["childrenTypes"] == []
-
-    def test_should_format_nested_agent_nodes(self):
-        """Should format nested agent nodes."""
-        node: AgentNode = {
-            "id": "main",
-            "type": "agent",
-            "name": None,
-            "major_version": None,
-            "params": {},
-            "prompt": "Intro: {{introduction}}",
-            "children": [
-                {
-                    "id": "introduction",
-                    "type": "prompt",
-                    "name": None,
-                    "major_version": None,
-                    "params": {"userName": "Bob"},
-                    "prompt": "Hello, {{userName}}!",
-                    "children": [],
-                },
-            ],
-        }
-
-        request = format_entity_request(node)
-
-        assert request["entities"]["rootId"] == "main"
-        assert request["entities"]["rootType"] == "agent"
-        assert request["entities"]["map"]["main"]["id"] == "main"
-        assert request["entities"]["map"]["main"]["type"] == "agent"
-        assert request["entities"]["map"]["main"]["prompt"] == "Intro: {{introduction}}"
-        assert request["entities"]["map"]["main"]["paramKeys"] == ["introduction"]
-        assert request["entities"]["map"]["main"]["childrenIds"] == ["introduction"]
-        assert request["entities"]["map"]["main"]["childrenTypes"] == ["prompt"]
-        assert request["entities"]["map"]["introduction"]["id"] == "introduction"
-        assert request["entities"]["map"]["introduction"]["type"] == "prompt"
-        assert request["entities"]["map"]["introduction"]["prompt"] == "Hello, {{userName}}!"
-        assert request["entities"]["map"]["introduction"]["paramKeys"] == ["userName"]
-        assert request["entities"]["map"]["introduction"]["childrenIds"] == []
-
-    def test_should_format_agent_node_with_hyperparameters(self):
-        """Should format agent node with hyperparameters."""
-        node: AgentNode = {
-            "id": "greeting",
-            "type": "agent",
-            "name": None,
-            "major_version": None,
-            "params": {},
-            "prompt": "Hello!",
-            "children": [],
-            "model": "gpt-4",
-            "provider": "openai",
-            "temperature": 0.7,
-            "max_tokens": 1000,
-            "top_p": 0.9,
-            "frequency_penalty": 0.5,
-            "presence_penalty": 0.3,
-            "stop_sequences": ["END"],
-            "tools": ["search"],
-        }
-
-        request = format_entity_request(node)
-
-        assert request["entities"]["map"]["greeting"]["model"] == "gpt-4"
-        assert request["entities"]["map"]["greeting"]["provider"] == "openai"
-        assert request["entities"]["map"]["greeting"]["temperature"] == 0.7
-        assert request["entities"]["map"]["greeting"]["maxTokens"] == 1000
-        assert request["entities"]["map"]["greeting"]["topP"] == 0.9
-        assert request["entities"]["map"]["greeting"]["frequencyPenalty"] == 0.5
-        assert request["entities"]["map"]["greeting"]["presencePenalty"] == 0.3
-        assert request["entities"]["map"]["greeting"]["stopSequences"] == ["END"]
-        assert request["entities"]["map"]["greeting"]["tools"] == ["search"]
-
-    def test_should_format_deeply_nested_structure(self):
-        """Should format deeply nested structure."""
-        node: AgentNode = {
-            "id": "doc",
-            "type": "agent",
-            "name": None,
-            "major_version": None,
-            "params": {},
-            "prompt": "{{section}}",
-            "children": [
-                {
-                    "id": "section",
-                    "type": "prompt",
-                    "name": None,
-                    "major_version": None,
-                    "params": {},
-                    "prompt": "{{paragraph}}",
-                    "children": [
-                        {
-                            "id": "paragraph",
-                            "type": "prompt",
-                            "name": None,
-                            "major_version": None,
-                            "params": {"text": "content"},
-                            "prompt": "{{text}}",
-                            "children": [],
-                        },
-                    ],
-                },
-            ],
-        }
-
-        request = format_entity_request(node)
-
-        assert request["entities"]["rootId"] == "doc"
-        assert request["entities"]["rootType"] == "agent"
-        assert len(request["entities"]["map"]) == 3
-        assert request["entities"]["map"]["doc"]["childrenIds"] == ["section"]
-        assert request["entities"]["map"]["section"]["childrenIds"] == ["paragraph"]
-        assert request["entities"]["map"]["paragraph"]["paramKeys"] == ["text"]
-
-    def test_should_handle_multiple_children(self):
-        """Should handle multiple children."""
-        node: AgentNode = {
-            "id": "document",
-            "type": "agent",
-            "name": None,
-            "major_version": None,
-            "params": {},
-            "prompt": "{{header}} {{body}} {{footer}}",
-            "children": [
-                {
-                    "id": "header",
-                    "type": "prompt",
-                    "name": None,
-                    "major_version": None,
-                    "params": {},
-                    "prompt": "HEADER",
-                    "children": [],
-                },
-                {
-                    "id": "body",
-                    "type": "prompt",
-                    "name": None,
-                    "major_version": None,
-                    "params": {"content": "text"},
-                    "prompt": "{{content}}",
-                    "children": [],
-                },
-                {
-                    "id": "footer",
-                    "type": "prompt",
-                    "name": None,
-                    "major_version": None,
-                    "params": {},
-                    "prompt": "FOOTER",
-                    "children": [],
-                },
-            ],
-        }
-
-        request = format_entity_request(node)
-
-        assert request["entities"]["map"]["document"]["childrenIds"] == [
-            "header",
-            "body",
-            "footer",
-        ]
-        assert request["entities"]["map"]["document"]["childrenTypes"] == [
-            "prompt",
-            "prompt",
-            "prompt",
-        ]
-        assert len(request["entities"]["map"]) == 4
+# Note: Parameter validation and evaluation is now handled server-side by the V2 API
+# The following functions were removed: insert_params_into_prompt, evaluate_agent, traverse_agent_node, format_entity_request
 
 
 class TestUpdateAgentNodes:
@@ -767,8 +175,7 @@ class TestUpdateAgentNodes:
         """Should update a single node."""
         node: AgentNode = {
             "id": "greeting",
-            "name": None,
-            "major_version": None,
+            "type": "agent",
             "params": {},
             "prompt": "Old prompt",
             "children": [],
@@ -783,23 +190,20 @@ class TestUpdateAgentNodes:
         """Should update all nodes in a nested structure."""
         node: AgentNode = {
             "id": "root",
-            "name": None,
-            "major_version": None,
+            "type": "agent",
             "params": {},
             "prompt": "root",
             "children": [
                 {
                     "id": "child1",
-                    "name": None,
-                    "major_version": None,
+                    "type": "agent",
                     "params": {},
                     "prompt": "child1",
                     "children": [],
                 },
                 {
                     "id": "child2",
-                    "name": None,
-                    "major_version": None,
+                    "type": "agent",
                     "params": {},
                     "prompt": "child2",
                     "children": [],
@@ -817,22 +221,19 @@ class TestUpdateAgentNodes:
         """Should update deeply nested nodes."""
         node: AgentNode = {
             "id": "level1",
-            "name": None,
-            "major_version": None,
+            "type": "agent",
             "params": {},
             "prompt": "level1",
             "children": [
                 {
                     "id": "level2",
-                    "name": None,
-                    "major_version": None,
+                    "type": "agent",
                     "params": {},
                     "prompt": "level2",
                     "children": [
                         {
                             "id": "level3",
-                            "name": None,
-                            "major_version": None,
+                            "type": "agent",
                             "params": {},
                             "prompt": "level3",
                             "children": [],
@@ -852,6 +253,7 @@ class TestUpdateAgentNodes:
         """Should preserve node structure while updating."""
         node: AgentNode = {
             "id": "root",
+            "type": "agent",
             "name": "root-name",
             "major_version": 1,
             "params": {"key": "value"},
@@ -859,8 +261,7 @@ class TestUpdateAgentNodes:
             "children": [
                 {
                     "id": "child",
-                    "name": None,
-                    "major_version": None,
+                    "type": "agent",
                     "params": {},
                     "prompt": "child-original",
                     "children": [],
@@ -881,23 +282,20 @@ class TestUpdateAgentNodes:
         """Should allow conditional updates."""
         node: AgentNode = {
             "id": "root",
-            "name": None,
-            "major_version": None,
+            "type": "agent",
             "params": {},
             "prompt": "root",
             "children": [
                 {
                     "id": "update-me",
-                    "name": None,
-                    "major_version": None,
+                    "type": "agent",
                     "params": {},
                     "prompt": "old",
                     "children": [],
                 },
                 {
                     "id": "leave-me",
-                    "name": None,
-                    "major_version": None,
+                    "type": "agent",
                     "params": {},
                     "prompt": "unchanged",
                     "children": [],
@@ -914,3 +312,234 @@ class TestUpdateAgentNodes:
 
         assert updated["children"][0]["prompt"] == "new"
         assert updated["children"][1]["prompt"] == "unchanged"
+
+
+class TestFormatEntityV2Request:
+    """Tests for format_entity_v2_request function."""
+
+    def test_should_format_simple_agent_node(self):
+        """Should format a simple agent node."""
+        node: AgentNode = {
+            "id": "greeting",
+            "type": "agent",
+            "name": "greeting-agent",
+            "major_version": 1,
+            "params": {"userName": "Alice"},
+            "prompt": "Hello, {{userName}}!",
+            "children": [],
+            "model": "gpt-4",
+            "provider": "openai",
+        }
+
+        request = format_entity_v2_request(node)
+
+        assert request["id"] == "greeting"
+        assert request["type"] == "agent"
+        assert request["name"] == "greeting-agent"
+        assert request["majorVersion"] == 1
+        assert request["prompt"] == "Hello, {{userName}}!"
+        assert request["params"] == {"userName": "Alice"}
+        assert request["data"]["model"] == "gpt-4"
+        assert request["data"]["provider"] == "openai"
+
+    def test_should_format_nested_agent_nodes_with_param_values(self):
+        """Should format nested agent nodes with param values."""
+        node: AgentNode = {
+            "id": "main",
+            "type": "agent",
+            "params": {},
+            "prompt": "Intro: {{introduction}}",
+            "children": [
+                {
+                    "id": "introduction",
+                    "type": "prompt",
+                    "params": {"userName": "Bob"},
+                    "prompt": "Hello, {{userName}}!",
+                    "children": [],
+                },
+            ],
+            "model": "gpt-4",
+            "provider": "openai",
+        }
+
+        request = format_entity_v2_request(node)
+
+        assert request["id"] == "main"
+        assert request["type"] == "agent"
+        assert request["params"] is not None
+        assert "introduction" in request["params"]
+
+        # The nested entity should be a full EntityV2Request object
+        nested_intro = request["params"]["introduction"]
+        assert nested_intro["id"] == "introduction"
+        assert nested_intro["type"] == "prompt"
+        assert nested_intro["prompt"] == "Hello, {{userName}}!"
+        assert nested_intro["params"] == {"userName": "Bob"}
+
+    def test_should_format_agent_node_with_all_hyperparameters_in_data(self):
+        """Should format agent node with all hyperparameters in data."""
+        node: AgentNode = {
+            "id": "greeting",
+            "type": "agent",
+            "params": {},
+            "prompt": "Hello!",
+            "children": [],
+            "model": "gpt-4",
+            "provider": "openai",
+            "temperature": 0.7,
+            "max_tokens": 1000,
+            "top_p": 0.9,
+            "frequency_penalty": 0.5,
+            "presence_penalty": 0.3,
+            "stop_sequences": ["END"],
+            "tools": ["search", "calculator"],
+        }
+
+        request = format_entity_v2_request(node)
+
+        assert request["data"] is not None
+        assert request["data"]["model"] == "gpt-4"
+        assert request["data"]["provider"] == "openai"
+        assert request["data"]["temperature"] == 0.7
+        assert request["data"]["maxTokens"] == 1000
+        assert request["data"]["topP"] == 0.9
+        assert request["data"]["frequencyPenalty"] == 0.5
+        assert request["data"]["presencePenalty"] == 0.3
+        assert request["data"]["stopSequences"] == ["END"]
+        assert request["data"]["tools"] == ["search", "calculator"]
+
+    def test_should_not_include_data_for_non_agent_types(self):
+        """Should not include data for non-agent types."""
+        node: EntityNode = {
+            "id": "my-prompt",
+            "type": "prompt",
+            "params": {"value": "test"},
+            "prompt": "Value: {{value}}",
+            "children": [],
+        }
+
+        request = format_entity_v2_request(node)
+
+        assert request["id"] == "my-prompt"
+        assert request["type"] == "prompt"
+        assert request.get("data") is None
+
+    def test_should_format_deeply_nested_structure(self):
+        """Should format deeply nested structure."""
+        node: AgentNode = {
+            "id": "doc",
+            "type": "agent",
+            "params": {},
+            "prompt": "{{section}}",
+            "children": [
+                {
+                    "id": "section",
+                    "type": "prompt",
+                    "params": {},
+                    "prompt": "{{paragraph}}",
+                    "children": [
+                        {
+                            "id": "paragraph",
+                            "type": "prompt",
+                            "params": {"text": "content"},
+                            "prompt": "{{text}}",
+                            "children": [],
+                        },
+                    ],
+                },
+            ],
+            "model": "gpt-4",
+            "provider": "openai",
+        }
+
+        request = format_entity_v2_request(node)
+
+        assert request["id"] == "doc"
+        section = request["params"]["section"]
+        assert section["id"] == "section"
+        paragraph = section["params"]["paragraph"]
+        assert paragraph["id"] == "paragraph"
+        assert paragraph["params"] == {"text": "content"}
+
+    def test_should_mix_string_params_and_nested_entities(self):
+        """Should mix string params and nested entities."""
+        node: AgentNode = {
+            "id": "document",
+            "type": "agent",
+            "params": {"title": "My Document"},
+            "prompt": "{{title}}: {{body}}",
+            "children": [
+                {
+                    "id": "body",
+                    "type": "prompt",
+                    "params": {"content": "Hello World"},
+                    "prompt": "Content: {{content}}",
+                    "children": [],
+                },
+            ],
+            "model": "gpt-4",
+            "provider": "openai",
+        }
+
+        request = format_entity_v2_request(node)
+
+        assert request["params"]["title"] == "My Document"  # String param
+        assert isinstance(request["params"]["body"], dict)  # Nested entity
+        body = request["params"]["body"]
+        assert body["id"] == "body"
+
+    def test_should_omit_params_when_empty(self):
+        """Should omit params when empty."""
+        node: EntityNode = {
+            "id": "simple",
+            "type": "prompt",
+            "params": {},
+            "prompt": "Static text",
+            "children": [],
+        }
+
+        request = format_entity_v2_request(node)
+
+        assert request.get("params") is None
+
+    def test_should_handle_multiple_children(self):
+        """Should handle multiple children."""
+        node: AgentNode = {
+            "id": "document",
+            "type": "agent",
+            "params": {},
+            "prompt": "{{header}} {{body}} {{footer}}",
+            "children": [
+                {
+                    "id": "header",
+                    "type": "prompt",
+                    "params": {},
+                    "prompt": "HEADER",
+                    "children": [],
+                },
+                {
+                    "id": "body",
+                    "type": "prompt",
+                    "params": {"content": "text"},
+                    "prompt": "{{content}}",
+                    "children": [],
+                },
+                {
+                    "id": "footer",
+                    "type": "prompt",
+                    "params": {},
+                    "prompt": "FOOTER",
+                    "children": [],
+                },
+            ],
+            "model": "gpt-4",
+            "provider": "openai",
+        }
+
+        request = format_entity_v2_request(node)
+
+        params = request.get("params", {})
+        assert len(params) == 3
+        assert "header" in params
+        assert "body" in params
+        assert "footer" in params

@@ -1,7 +1,7 @@
 """
 Unit tests for Hone SDK client.
 
-Exact replica of TypeScript client.test.ts - tests the Hone client class.
+Matches TypeScript client.test.ts - tests the Hone client class with V2 API.
 """
 
 import json
@@ -12,7 +12,7 @@ import pytest
 import respx
 
 from hone.client import Hone, create_hone_client, DEFAULT_BASE_URL
-from hone.types import HoneConfig, Message
+from hone.types import HoneConfig, Message, EntityV2Response
 
 
 class TestHoneConstructor:
@@ -67,7 +67,7 @@ class TestHoneConstructor:
 
 
 class TestHoneAgent:
-    """Tests for Hone.agent method."""
+    """Tests for Hone.agent method using V2 API."""
 
     @pytest.fixture
     def mock_api_key(self):
@@ -80,19 +80,25 @@ class TestHoneAgent:
     @respx.mock
     @pytest.mark.asyncio
     async def test_should_fetch_agent_successfully_and_return_evaluated_result(self, client):
-        """Should fetch agent successfully and return evaluated result."""
-        mock_response = {
-            "entities": {
-                "greeting": {
-                    "prompt": "Hello, {{userName}}! Welcome.",
-                    "type": "agent",
-                    "model": "gpt-4",
-                    "provider": "openai",
-                },
-            }
+        """Should fetch agent successfully and return evaluated result with hyperparameters."""
+        mock_response: EntityV2Response = {
+            "evaluatedPrompt": "Hello, Alice! Welcome.",
+            "template": "Hello, {{userName}}! Welcome.",
+            "type": "agent",
+            "data": {
+                "model": "gpt-4",
+                "provider": "openai",
+                "temperature": 0.7,
+                "maxTokens": 1000,
+                "topP": 0.9,
+                "frequencyPenalty": 0.1,
+                "presencePenalty": 0.2,
+                "stopSequences": ["END"],
+                "tools": [],
+            },
         }
 
-        respx.post(f"{DEFAULT_BASE_URL}/sync_entities").mock(
+        respx.post(f"{DEFAULT_BASE_URL}/v2/entities").mock(
             return_value=httpx.Response(200, json=mock_response)
         )
 
@@ -108,48 +114,50 @@ class TestHoneAgent:
         assert result["system_prompt"] == "Hello, Alice! Welcome."
         assert result["model"] == "gpt-4"
         assert result["provider"] == "openai"
+        assert result["temperature"] == 0.7
+        assert result["max_tokens"] == 1000
 
     @respx.mock
     @pytest.mark.asyncio
-    async def test_should_use_fallback_agent_when_api_call_fails(self, client, capsys):
-        """Should use fallback agent when API call fails."""
-        respx.post(f"{DEFAULT_BASE_URL}/sync_entities").mock(
+    async def test_should_throw_error_when_api_call_fails_no_fallback(self, client):
+        """Should throw error when API call fails (no fallback)."""
+        respx.post(f"{DEFAULT_BASE_URL}/v2/entities").mock(
             side_effect=httpx.RequestError("Network error")
         )
 
-        result = await client.agent("greeting", {
-            "model": "gpt-4",
-            "provider": "openai",
-            "default_prompt": "Hi, {{userName}}!",
-            "params": {
-                "userName": "Bob",
-            },
-        })
-
-        assert result["system_prompt"] == "Hi, Bob!"
-        captured = capsys.readouterr()
-        assert "Error fetching agent, using fallback:" in captured.out
+        with pytest.raises(Exception, match="Network error"):
+            await client.agent("greeting", {
+                "model": "gpt-4",
+                "provider": "openai",
+                "default_prompt": "Hi, {{userName}}!",
+                "params": {
+                    "userName": "Bob",
+                },
+            })
 
     @respx.mock
     @pytest.mark.asyncio
-    async def test_should_handle_nested_agents(self, client):
-        """Should handle nested agents."""
-        mock_response = {
-            "entities": {
-                "main": {
-                    "prompt": "Welcome: {{intro}}",
-                    "type": "agent",
-                    "model": "gpt-4",
-                    "provider": "openai",
-                },
-                "intro": {
-                    "prompt": "Hello, {{userName}}!",
-                    "type": "prompt",
-                },
-            }
+    async def test_should_handle_nested_agents_v2_evaluates_server_side(self, client):
+        """Should handle nested agents (V2 evaluates server-side)."""
+        # V2 API returns already evaluated prompt - nesting is handled server-side
+        mock_response: EntityV2Response = {
+            "evaluatedPrompt": "Welcome: Hello, Charlie!",
+            "template": "Welcome: {{intro}}",
+            "type": "agent",
+            "data": {
+                "model": "gpt-4",
+                "provider": "openai",
+                "temperature": None,
+                "maxTokens": None,
+                "topP": None,
+                "frequencyPenalty": None,
+                "presencePenalty": None,
+                "stopSequences": [],
+                "tools": [],
+            },
         }
 
-        respx.post(f"{DEFAULT_BASE_URL}/sync_entities").mock(
+        respx.post(f"{DEFAULT_BASE_URL}/v2/entities").mock(
             return_value=httpx.Response(200, json=mock_response)
         )
 
@@ -173,18 +181,24 @@ class TestHoneAgent:
     @pytest.mark.asyncio
     async def test_should_handle_agent_with_no_parameters(self, client):
         """Should handle agent with no parameters."""
-        mock_response = {
-            "entities": {
-                "static": {
-                    "prompt": "This is a static prompt",
-                    "type": "agent",
-                    "model": "gpt-4",
-                    "provider": "openai",
-                },
-            }
+        mock_response: EntityV2Response = {
+            "evaluatedPrompt": "This is a static prompt",
+            "template": "This is a static prompt",
+            "type": "agent",
+            "data": {
+                "model": "gpt-4",
+                "provider": "openai",
+                "temperature": None,
+                "maxTokens": None,
+                "topP": None,
+                "frequencyPenalty": None,
+                "presencePenalty": None,
+                "stopSequences": [],
+                "tools": [],
+            },
         }
 
-        respx.post(f"{DEFAULT_BASE_URL}/sync_entities").mock(
+        respx.post(f"{DEFAULT_BASE_URL}/v2/entities").mock(
             return_value=httpx.Response(200, json=mock_response)
         )
 
@@ -198,31 +212,41 @@ class TestHoneAgent:
 
     @respx.mock
     @pytest.mark.asyncio
-    async def test_should_use_fallback_when_api_returns_error_status(self, client, capsys):
-        """Should use fallback when API returns error status."""
-        respx.post(f"{DEFAULT_BASE_URL}/sync_entities").mock(
-            return_value=httpx.Response(404, json={"message": "Agent not found"})
+    async def test_should_throw_error_when_api_returns_error_status_no_fallback(self, client):
+        """Should throw error when API returns error status (no fallback)."""
+        respx.post(f"{DEFAULT_BASE_URL}/v2/entities").mock(
+            return_value=httpx.Response(404, json={"error": "Agent not found"})
         )
 
-        result = await client.agent("missing", {
-            "model": "gpt-4",
-            "provider": "openai",
-            "default_prompt": "Fallback prompt",
-        })
-
-        assert result["system_prompt"] == "Fallback prompt"
+        with pytest.raises(Exception, match="Hone API error \\(404\\)"):
+            await client.agent("missing", {
+                "model": "gpt-4",
+                "provider": "openai",
+                "default_prompt": "Fallback prompt",
+            })
 
     @respx.mock
     @pytest.mark.asyncio
     async def test_should_handle_major_version_and_name_in_agent_options(self, client):
         """Should handle majorVersion and name in agent options."""
-        mock_response = {
-            "entities": {
-                "greeting-v2": {"prompt": "Hello v2!"},
-            }
+        mock_response: EntityV2Response = {
+            "evaluatedPrompt": "Hello v2!",
+            "template": "Hello v2!",
+            "type": "agent",
+            "data": {
+                "model": None,
+                "provider": None,
+                "temperature": None,
+                "maxTokens": None,
+                "topP": None,
+                "frequencyPenalty": None,
+                "presencePenalty": None,
+                "stopSequences": [],
+                "tools": [],
+            },
         }
 
-        route = respx.post(f"{DEFAULT_BASE_URL}/sync_entities").mock(
+        route = respx.post(f"{DEFAULT_BASE_URL}/v2/entities").mock(
             return_value=httpx.Response(200, json=mock_response)
         )
 
@@ -232,18 +256,36 @@ class TestHoneAgent:
             "default_prompt": "Hello v1!",
         })
 
-        # Verify request body
+        # Verify V2 request format
         request = route.calls.last.request
         body = json.loads(request.content)
-        assert body["entities"]["map"]["greeting-v2"]["majorVersion"] == 2
-        assert body["entities"]["map"]["greeting-v2"]["name"] == "greeting"
+        assert body["id"] == "greeting-v2"
+        assert body["majorVersion"] == 2
+        assert body["name"] == "greeting"
 
     @respx.mock
     @pytest.mark.asyncio
     async def test_should_send_correct_request_format_to_api(self, client):
-        """Should send correct request format to API."""
-        route = respx.post(f"{DEFAULT_BASE_URL}/sync_entities").mock(
-            return_value=httpx.Response(200, json={"entities": {}})
+        """Should send correct V2 request format to API."""
+        mock_response: EntityV2Response = {
+            "evaluatedPrompt": "Test value1",
+            "template": "Test {{param1}}",
+            "type": "agent",
+            "data": {
+                "model": None,
+                "provider": None,
+                "temperature": None,
+                "maxTokens": None,
+                "topP": None,
+                "frequencyPenalty": None,
+                "presencePenalty": None,
+                "stopSequences": [],
+                "tools": [],
+            },
+        }
+
+        route = respx.post(f"{DEFAULT_BASE_URL}/v2/entities").mock(
+            return_value=httpx.Response(200, json=mock_response)
         )
 
         await client.agent("test", {
@@ -256,40 +298,41 @@ class TestHoneAgent:
         request = route.calls.last.request
         body = json.loads(request.content)
 
-        assert body["entities"]["rootId"] == "test"
-        assert body["entities"]["rootType"] == "agent"
-        assert "map" in body["entities"]
-        assert body["entities"]["map"]["test"] == {
-            "id": "test",
-            "type": "agent",
-            "name": None,
-            "majorVersion": None,
-            "prompt": "Test {{param1}}",
-            "paramKeys": ["param1"],
-            "childrenIds": [],
-            "childrenTypes": [],
-            "model": None,
-            "provider": None,
-            "temperature": None,
-            "maxTokens": None,
-            "topP": None,
-            "frequencyPenalty": None,
-            "presencePenalty": None,
-            "stopSequences": None,
-            "tools": None,
-        }
+        # V2 uses flat structure with params containing values
+        assert body["id"] == "test"
+        assert body["type"] == "agent"
+        assert body["prompt"] == "Test {{param1}}"
+        assert body["params"] == {"param1": "value1"}
 
     @respx.mock
     @pytest.mark.asyncio
     async def test_should_send_hyperparameters_in_request(self, client):
-        """Should send hyperparameters in request."""
-        route = respx.post(f"{DEFAULT_BASE_URL}/sync_entities").mock(
-            return_value=httpx.Response(200, json={"entities": {}})
+        """Should send hyperparameters in V2 request data field."""
+        mock_response: EntityV2Response = {
+            "evaluatedPrompt": "Test prompt",
+            "template": "Test prompt",
+            "type": "agent",
+            "data": {
+                "model": "gpt-4",
+                "provider": "openai",
+                "temperature": 0.7,
+                "maxTokens": 1000,
+                "topP": 0.9,
+                "frequencyPenalty": 0.5,
+                "presencePenalty": 0.3,
+                "stopSequences": ["END"],
+                "tools": [],
+            },
+        }
+
+        route = respx.post(f"{DEFAULT_BASE_URL}/v2/entities").mock(
+            return_value=httpx.Response(200, json=mock_response)
         )
 
         await client.agent("test", {
             "default_prompt": "Test prompt",
             "model": "gpt-4",
+            "provider": "openai",
             "temperature": 0.7,
             "max_tokens": 1000,
             "top_p": 0.9,
@@ -301,13 +344,15 @@ class TestHoneAgent:
         request = route.calls.last.request
         body = json.loads(request.content)
 
-        assert body["entities"]["map"]["test"]["model"] == "gpt-4"
-        assert body["entities"]["map"]["test"]["temperature"] == 0.7
-        assert body["entities"]["map"]["test"]["maxTokens"] == 1000
-        assert body["entities"]["map"]["test"]["topP"] == 0.9
-        assert body["entities"]["map"]["test"]["frequencyPenalty"] == 0.5
-        assert body["entities"]["map"]["test"]["presencePenalty"] == 0.3
-        assert body["entities"]["map"]["test"]["stopSequences"] == ["END"]
+        # V2 puts hyperparameters in data field
+        assert body["data"]["model"] == "gpt-4"
+        assert body["data"]["provider"] == "openai"
+        assert body["data"]["temperature"] == 0.7
+        assert body["data"]["maxTokens"] == 1000
+        assert body["data"]["topP"] == 0.9
+        assert body["data"]["frequencyPenalty"] == 0.5
+        assert body["data"]["presencePenalty"] == 0.3
+        assert body["data"]["stopSequences"] == ["END"]
 
 
 class TestHoneTrack:

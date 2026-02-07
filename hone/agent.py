@@ -4,7 +4,7 @@ Agent and Entity utilities for the Hone SDK.
 Handles entity tree building and formatting for the V2 API.
 """
 
-from typing import Dict, List, Optional, Set, Any, Union
+from typing import Callable, Dict, List, Optional, Set, Any, Union
 
 from .types import (
     GetAgentOptions,
