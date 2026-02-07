@@ -1,7 +1,7 @@
 """
 Agent and Entity utilities for the Hone SDK.
 
-Handles entity tree building and formatting for the V2 API.
+Handles entity tree building and formatting for the evaluate API.
 """
 
 from typing import Callable, Dict, List, Optional, Set, Any, Union
@@ -170,8 +170,8 @@ def _get_entity_node(
 
 def format_entity_v2_request(node: EntityNode) -> "EntityV2Request":
     """
-    Formats an EntityNode into an EntityV2Request suitable for the /api/v2/entities API.
-    V2 uses nested structure with param values (not just keys).
+    Formats an EntityNode into an EntityV2Request suitable for the /api/evaluate API.
+    Uses nested structure with param values (not just keys).
 
     Args:
         node: The root EntityNode to format

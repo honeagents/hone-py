@@ -1,8 +1,8 @@
 """
 Unit tests for Hone SDK agent utilities.
 
-Matches TypeScript agent.test.ts - tests agent utility functions for V2 API.
-Note: Parameter validation and evaluation is now handled server-side by the V2 API.
+Matches TypeScript agent.test.ts - tests agent utility functions.
+Note: Parameter validation and evaluation is handled server-side.
 """
 
 import pytest
@@ -164,7 +164,7 @@ class TestGetAgentNode:
             get_agent_node("a", options)
 
 
-# Note: Parameter validation and evaluation is now handled server-side by the V2 API
+# Note: Parameter validation and evaluation is handled server-side
 # The following functions were removed: insert_params_into_prompt, evaluate_agent, traverse_agent_node, format_entity_request
 
 

@@ -1,7 +1,7 @@
 """
 Unit tests for Hone SDK client.
 
-Matches TypeScript client.test.ts - tests the Hone client class with V2 API.
+Matches TypeScript client.test.ts - tests the Hone client class.
 """
 
 import json
@@ -67,7 +67,7 @@ class TestHoneConstructor:
 
 
 class TestHoneAgent:
-    """Tests for Hone.agent method using V2 API."""
+    """Tests for Hone.agent method."""
 
     @pytest.fixture
     def mock_api_key(self):
@@ -98,7 +98,7 @@ class TestHoneAgent:
             },
         }
 
-        respx.post(f"{DEFAULT_BASE_URL}/v2/entities").mock(
+        respx.post(f"{DEFAULT_BASE_URL}/evaluate").mock(
             return_value=httpx.Response(200, json=mock_response)
         )
 
@@ -121,7 +121,7 @@ class TestHoneAgent:
     @pytest.mark.asyncio
     async def test_should_throw_error_when_api_call_fails_no_fallback(self, client):
         """Should throw error when API call fails (no fallback)."""
-        respx.post(f"{DEFAULT_BASE_URL}/v2/entities").mock(
+        respx.post(f"{DEFAULT_BASE_URL}/evaluate").mock(
             side_effect=httpx.RequestError("Network error")
         )
 
@@ -138,8 +138,8 @@ class TestHoneAgent:
     @respx.mock
     @pytest.mark.asyncio
     async def test_should_handle_nested_agents_v2_evaluates_server_side(self, client):
-        """Should handle nested agents (V2 evaluates server-side)."""
-        # V2 API returns already evaluated prompt - nesting is handled server-side
+        """Should handle nested agents (evaluates server-side)."""
+        # API returns already evaluated prompt - nesting is handled server-side
         mock_response: EntityV2Response = {
             "evaluatedPrompt": "Welcome: Hello, Charlie!",
             "template": "Welcome: {{intro}}",
@@ -157,7 +157,7 @@ class TestHoneAgent:
             },
         }
 
-        respx.post(f"{DEFAULT_BASE_URL}/v2/entities").mock(
+        respx.post(f"{DEFAULT_BASE_URL}/evaluate").mock(
             return_value=httpx.Response(200, json=mock_response)
         )
 
@@ -198,7 +198,7 @@ class TestHoneAgent:
             },
         }
 
-        respx.post(f"{DEFAULT_BASE_URL}/v2/entities").mock(
+        respx.post(f"{DEFAULT_BASE_URL}/evaluate").mock(
             return_value=httpx.Response(200, json=mock_response)
         )
 
@@ -214,7 +214,7 @@ class TestHoneAgent:
     @pytest.mark.asyncio
     async def test_should_throw_error_when_api_returns_error_status_no_fallback(self, client):
         """Should throw error when API returns error status (no fallback)."""
-        respx.post(f"{DEFAULT_BASE_URL}/v2/entities").mock(
+        respx.post(f"{DEFAULT_BASE_URL}/evaluate").mock(
             return_value=httpx.Response(404, json={"error": "Agent not found"})
         )
 
@@ -246,7 +246,7 @@ class TestHoneAgent:
             },
         }
 
-        route = respx.post(f"{DEFAULT_BASE_URL}/v2/entities").mock(
+        route = respx.post(f"{DEFAULT_BASE_URL}/evaluate").mock(
             return_value=httpx.Response(200, json=mock_response)
         )
 
@@ -284,7 +284,7 @@ class TestHoneAgent:
             },
         }
 
-        route = respx.post(f"{DEFAULT_BASE_URL}/v2/entities").mock(
+        route = respx.post(f"{DEFAULT_BASE_URL}/evaluate").mock(
             return_value=httpx.Response(200, json=mock_response)
         )
 
@@ -325,7 +325,7 @@ class TestHoneAgent:
             },
         }
 
-        route = respx.post(f"{DEFAULT_BASE_URL}/v2/entities").mock(
+        route = respx.post(f"{DEFAULT_BASE_URL}/evaluate").mock(
             return_value=httpx.Response(200, json=mock_response)
         )
 

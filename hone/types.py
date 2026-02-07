@@ -280,7 +280,7 @@ class EntityV2ResponseData(TypedDict, total=False):
 
 
 class EntityV2Response(TypedDict):
-    """V2 Entity Response - evaluated result from /api/v2/entities."""
+    """Entity Response - evaluated result from /api/evaluate."""
     evaluatedPrompt: str
     template: str
     type: EntityType

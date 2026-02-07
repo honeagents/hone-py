@@ -131,7 +131,7 @@ class Hone:
         """
         node = get_agent_node(id, options)
 
-        # Format request using V2 nested structure
+        # Format request using nested structure
         request = format_entity_v2_request(node)
 
         # Include extra data in the request
@@ -139,9 +139,9 @@ class Hone:
         if extra_data and request.get("data"):
             request["data"].update(extra_data)
 
-        # Call V2 endpoint - server handles evaluation
+        # Call evaluate endpoint - server handles evaluation
         response: EntityV2Response = await self._make_request(
-            "/v2/entities",
+            "/evaluate",
             "POST",
             request,
         )
@@ -149,7 +149,7 @@ class Hone:
         # Extract data from response
         data = response.get("data", {})
 
-        # Build the result - V2 response includes evaluated prompt
+        # Build the result - Response includes evaluated prompt
         result: AgentResult = {
             "system_prompt": response["evaluatedPrompt"],
             "model": data.get("model") or options.get("model", ""),
@@ -185,17 +185,17 @@ class Hone:
         """
         node = get_tool_node(id, options)
 
-        # Format request using V2 nested structure
+        # Format request using nested structure
         request = format_entity_v2_request(node)
 
-        # Call V2 endpoint - server handles evaluation
+        # Call evaluate endpoint - server handles evaluation
         response: EntityV2Response = await self._make_request(
-            "/v2/entities",
+            "/evaluate",
             "POST",
             request,
         )
 
-        # V2 response includes evaluated prompt - no client-side evaluation needed
+        # Response includes evaluated prompt - no client-side evaluation needed
         return {
             "prompt": response["evaluatedPrompt"],
         }
@@ -213,17 +213,17 @@ class Hone:
         """
         node = get_text_prompt_node(id, options)
 
-        # Format request using V2 nested structure
+        # Format request using nested structure
         request = format_entity_v2_request(node)
 
-        # Call V2 endpoint - server handles evaluation
+        # Call evaluate endpoint - server handles evaluation
         response: EntityV2Response = await self._make_request(
-            "/v2/entities",
+            "/evaluate",
             "POST",
             request,
         )
 
-        # V2 response includes evaluated prompt - no client-side evaluation needed
+        # Response includes evaluated prompt - no client-side evaluation needed
         return {
             "text": response["evaluatedPrompt"],
         }
