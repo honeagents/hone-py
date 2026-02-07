@@ -236,48 +236,38 @@ TextPromptNode = EntityNode  # Text prompt node has type="prompt"
 
 
 # =============================================================================
-# API Request/Response Types
+# V2 API Request/Response Types
 # =============================================================================
 
-class EntityRequestItem(TypedDict, total=False):
-    """A single entity item in the API request."""
-    id: str
-    type: EntityType
-    name: Optional[str]
-    majorVersion: Optional[int]  # camelCase to match TypeScript API
-    prompt: str
-    paramKeys: List[str]  # camelCase to match TypeScript API
-    childrenIds: List[str]  # camelCase to match TypeScript API
-    childrenTypes: List[EntityType]
-    # Hyperparameters
+class EntityV2RequestData(TypedDict, total=False):
+    """Type-specific data in V2 request."""
     model: Optional[str]
     provider: Optional[str]
     temperature: Optional[float]
-    maxTokens: Optional[int]  # camelCase to match TypeScript API
-    topP: Optional[float]  # camelCase to match TypeScript API
-    frequencyPenalty: Optional[float]  # camelCase to match TypeScript API
-    presencePenalty: Optional[float]  # camelCase to match TypeScript API
-    stopSequences: Optional[List[str]]  # camelCase to match TypeScript API
+    maxTokens: Optional[int]
+    topP: Optional[float]
+    frequencyPenalty: Optional[float]
+    presencePenalty: Optional[float]
+    stopSequences: Optional[List[str]]
     tools: Optional[List[str]]
 
 
-class EntityRequestPayload(TypedDict):
-    """The entities payload structure."""
-    rootId: str  # camelCase to match TypeScript API
-    rootType: EntityType
-    map: Dict[str, EntityRequestItem]
-
-
-class EntityRequest(TypedDict):
-    """The request payload sent to the /sync_entities endpoint."""
-    entities: EntityRequestPayload
-
-
-class EntityResponseItem(TypedDict, total=False):
-    """A single entity response item."""
-    prompt: str
+class EntityV2Request(TypedDict, total=False):
+    """
+    V2 Entity Request - nested structure with param values.
+    Params can be strings OR nested entity objects.
+    """
+    id: str
     type: EntityType
-    # Agent-specific fields (null for tools)
+    prompt: str
+    params: Dict[str, Union[str, "EntityV2Request"]]
+    majorVersion: Optional[int]
+    name: Optional[str]
+    data: EntityV2RequestData
+
+
+class EntityV2ResponseData(TypedDict, total=False):
+    """Type-specific data in V2 response."""
     model: Optional[str]
     provider: Optional[str]
     temperature: Optional[float]
@@ -287,13 +277,14 @@ class EntityResponseItem(TypedDict, total=False):
     presencePenalty: Optional[float]
     stopSequences: List[str]
     tools: List[str]
-    # Custom extra data
-    extra: Optional[Dict[str, Any]]
 
 
-# The response received from the /sync_entities endpoint
-# Key: entity ID, Value: the entity data
-EntityResponse = Dict[str, EntityResponseItem]
+class EntityV2Response(TypedDict):
+    """V2 Entity Response - evaluated result from /api/v2/entities."""
+    evaluatedPrompt: str
+    template: str
+    type: EntityType
+    data: EntityV2ResponseData
 
 
 # =============================================================================

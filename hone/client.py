@@ -18,21 +18,17 @@ from .types import (
     GetTextPromptOptions,
     HoneConfig,
     Message,
-    EntityResponse,
+    EntityV2Response,
     ToolResult,
     TextPromptResult,
     TrackConversationOptions,
     TrackRequest,
 )
 from .agent import (
-    evaluate_agent,
-    evaluate_entity,
-    format_entity_request,
+    format_entity_v2_request,
     get_agent_node,
     get_tool_node,
     get_text_prompt_node,
-    update_agent_nodes,
-    update_entity_nodes,
 )
 
 DEFAULT_BASE_URL = "https://honeagents.ai/api"
@@ -135,84 +131,46 @@ class Hone:
         """
         node = get_agent_node(id, options)
 
-        try:
-            formatted_request = format_entity_request(node)
+        # Format request using V2 nested structure
+        request = format_entity_v2_request(node)
 
-            # Include extra data in the request
-            extra_data = options.get("extra")
-            if extra_data:
-                root_entity = formatted_request["entities"]["map"].get(id)
-                if root_entity:
-                    root_entity["extra"] = extra_data
+        # Include extra data in the request
+        extra_data = options.get("extra")
+        if extra_data and request.get("data"):
+            request["data"].update(extra_data)
 
-            response = await self._make_request(
-                "/sync_entities",
-                "POST",
-                formatted_request,
-            )
+        # Call V2 endpoint - server handles evaluation
+        response: EntityV2Response = await self._make_request(
+            "/v2/entities",
+            "POST",
+            request,
+        )
 
-            entity_map: EntityResponse = response.get("entities", {})
+        # Extract data from response
+        data = response.get("data", {})
 
-            def update_with_remote(agent_node: Dict[str, Any]) -> Dict[str, Any]:
-                response_item = entity_map.get(agent_node["id"], {})
-                return {
-                    **agent_node,
-                    "prompt": response_item.get("prompt", agent_node["prompt"]),
-                    # Update hyperparameters from API response (if present)
-                    "model": response_item.get("model") or agent_node.get("model"),
-                    "temperature": response_item.get("temperature") if response_item.get("temperature") is not None else agent_node.get("temperature"),
-                    "max_tokens": response_item.get("maxTokens") if response_item.get("maxTokens") is not None else agent_node.get("max_tokens"),
-                    "top_p": response_item.get("topP") if response_item.get("topP") is not None else agent_node.get("top_p"),
-                    "frequency_penalty": response_item.get("frequencyPenalty") if response_item.get("frequencyPenalty") is not None else agent_node.get("frequency_penalty"),
-                    "presence_penalty": response_item.get("presencePenalty") if response_item.get("presencePenalty") is not None else agent_node.get("presence_penalty"),
-                    "stop_sequences": response_item.get("stopSequences") if response_item.get("stopSequences") else agent_node.get("stop_sequences"),
-                }
+        # Build the result - V2 response includes evaluated prompt
+        result: AgentResult = {
+            "system_prompt": response["evaluatedPrompt"],
+            "model": data.get("model") or options.get("model", ""),
+            "provider": data.get("provider") or options.get("provider", ""),
+            "temperature": data.get("temperature") if data.get("temperature") is not None else options.get("temperature"),
+            "max_tokens": data.get("maxTokens") if data.get("maxTokens") is not None else options.get("max_tokens"),
+            "top_p": data.get("topP") if data.get("topP") is not None else options.get("top_p"),
+            "frequency_penalty": data.get("frequencyPenalty") if data.get("frequencyPenalty") is not None else options.get("frequency_penalty"),
+            "presence_penalty": data.get("presencePenalty") if data.get("presencePenalty") is not None else options.get("presence_penalty"),
+            "stop_sequences": data.get("stopSequences") or options.get("stop_sequences", []),
+            "tools": data.get("tools") or options.get("tools", []),
+        }
 
-            updated_agent_node = update_agent_nodes(node, update_with_remote)
+        # Merge any extra data from response
+        known_keys = {"model", "provider", "temperature", "maxTokens", "topP",
+                     "frequencyPenalty", "presencePenalty", "stopSequences", "tools"}
+        extra_from_response = {k: v for k, v in data.items() if k not in known_keys}
+        if extra_from_response:
+            result.update(extra_from_response)
 
-            # Get the root agent's hyperparameters and extra from the response
-            root_response = entity_map.get(id, {})
-            extra_from_response = root_response.get("extra", extra_data or {})
-
-            # Build the result
-            result: AgentResult = {
-                "system_prompt": evaluate_agent(updated_agent_node),
-                "model": root_response.get("model") or options.get("model", ""),
-                "provider": root_response.get("provider") or options.get("provider", ""),
-                "temperature": root_response.get("temperature") if root_response.get("temperature") is not None else options.get("temperature"),
-                "max_tokens": root_response.get("maxTokens") if root_response.get("maxTokens") is not None else options.get("max_tokens"),
-                "top_p": root_response.get("topP") if root_response.get("topP") is not None else options.get("top_p"),
-                "frequency_penalty": root_response.get("frequencyPenalty") if root_response.get("frequencyPenalty") is not None else options.get("frequency_penalty"),
-                "presence_penalty": root_response.get("presencePenalty") if root_response.get("presencePenalty") is not None else options.get("presence_penalty"),
-                "stop_sequences": root_response.get("stopSequences") or options.get("stop_sequences", []),
-                "tools": root_response.get("tools") or options.get("tools", []),
-            }
-
-            # Merge extra data
-            if extra_from_response:
-                result.update(extra_from_response)
-
-            return result
-
-        except Exception as error:
-            print(f"Error fetching agent, using fallback: {error}")
-            # Fallback: use local defaults
-            extra_data = options.get("extra", {})
-            result: AgentResult = {
-                "system_prompt": evaluate_agent(node),
-                "model": options.get("model", ""),
-                "provider": options.get("provider", ""),
-                "temperature": options.get("temperature"),
-                "max_tokens": options.get("max_tokens"),
-                "top_p": options.get("top_p"),
-                "frequency_penalty": options.get("frequency_penalty"),
-                "presence_penalty": options.get("presence_penalty"),
-                "stop_sequences": options.get("stop_sequences", []),
-                "tools": options.get("tools", []),
-            }
-            if extra_data:
-                result.update(extra_data)
-            return result
+        return result
 
     async def tool(self, id: str, options: GetToolOptions) -> ToolResult:
         """
@@ -227,35 +185,20 @@ class Hone:
         """
         node = get_tool_node(id, options)
 
-        try:
-            formatted_request = format_entity_request(node)
-            response = await self._make_request(
-                "/sync_entities",
-                "POST",
-                formatted_request,
-            )
+        # Format request using V2 nested structure
+        request = format_entity_v2_request(node)
 
-            entity_map: EntityResponse = response.get("entities", {})
+        # Call V2 endpoint - server handles evaluation
+        response: EntityV2Response = await self._make_request(
+            "/v2/entities",
+            "POST",
+            request,
+        )
 
-            def update_with_remote(entity_node: Dict[str, Any]) -> Dict[str, Any]:
-                response_item = entity_map.get(entity_node["id"], {})
-                return {
-                    **entity_node,
-                    "prompt": response_item.get("prompt", entity_node["prompt"]),
-                }
-
-            updated_tool_node = update_entity_nodes(node, update_with_remote)
-
-            return {
-                "prompt": evaluate_entity(updated_tool_node),
-            }
-
-        except Exception as error:
-            print(f"Error fetching tool, using fallback: {error}")
-            # Fallback: use local defaults
-            return {
-                "prompt": evaluate_entity(node),
-            }
+        # V2 response includes evaluated prompt - no client-side evaluation needed
+        return {
+            "prompt": response["evaluatedPrompt"],
+        }
 
     async def prompt(self, id: str, options: GetTextPromptOptions) -> TextPromptResult:
         """
@@ -270,35 +213,20 @@ class Hone:
         """
         node = get_text_prompt_node(id, options)
 
-        try:
-            formatted_request = format_entity_request(node)
-            response = await self._make_request(
-                "/sync_entities",
-                "POST",
-                formatted_request,
-            )
+        # Format request using V2 nested structure
+        request = format_entity_v2_request(node)
 
-            entity_map: EntityResponse = response.get("entities", {})
+        # Call V2 endpoint - server handles evaluation
+        response: EntityV2Response = await self._make_request(
+            "/v2/entities",
+            "POST",
+            request,
+        )
 
-            def update_with_remote(entity_node: Dict[str, Any]) -> Dict[str, Any]:
-                response_item = entity_map.get(entity_node["id"], {})
-                return {
-                    **entity_node,
-                    "prompt": response_item.get("prompt", entity_node["prompt"]),
-                }
-
-            updated_prompt_node = update_entity_nodes(node, update_with_remote)
-
-            return {
-                "text": evaluate_entity(updated_prompt_node),
-            }
-
-        except Exception as error:
-            print(f"Error fetching prompt, using fallback: {error}")
-            # Fallback: use local defaults
-            return {
-                "text": evaluate_entity(node),
-            }
+        # V2 response includes evaluated prompt - no client-side evaluation needed
+        return {
+            "text": response["evaluatedPrompt"],
+        }
 
     async def track(
         self,

@@ -1,20 +1,16 @@
 """
 Agent and Entity utilities for the Hone SDK.
 
-Exact replica of TypeScript agent.ts - handles entity tree building,
-evaluation, and formatting.
+Handles entity tree building and formatting for the V2 API.
 """
 
-import re
-from typing import Callable, Dict, List, Optional, Set, Any, Union
+from typing import Dict, List, Optional, Set, Any, Union
 
 from .types import (
     GetAgentOptions,
     GetToolOptions,
     GetTextPromptOptions,
     EntityNode,
-    EntityRequest,
-    EntityRequestItem,
     SimpleParams,
     EntityType,
 )
@@ -172,199 +168,59 @@ def _get_entity_node(
     return node
 
 
-def evaluate_agent(node: EntityNode) -> str:
+def format_entity_v2_request(node: EntityNode) -> "EntityV2Request":
     """
-    Evaluates an EntityNode by recursively inserting parameters and nested entities.
-
-    Args:
-        node: The root EntityNode to evaluate.
-
-    Returns:
-        The fully evaluated prompt string.
-
-    Raises:
-        ValueError: if any placeholders in the prompt don't have corresponding parameter values
-    """
-    return evaluate_entity(node)
-
-
-def evaluate_entity(node: EntityNode) -> str:
-    """
-    Evaluates an EntityNode by recursively inserting parameters and nested entities.
-
-    Args:
-        node: The root EntityNode to evaluate.
-
-    Returns:
-        The fully evaluated prompt string.
-
-    Raises:
-        ValueError: if any placeholders in the prompt don't have corresponding parameter values
-    """
-    evaluated: Dict[str, str] = {}
-
-    def evaluate(n: EntityNode) -> str:
-        if n["id"] in evaluated:
-            return evaluated[n["id"]]
-
-        params: SimpleParams = dict(n["params"])
-
-        # Evaluate all children first (depth-first)
-        for child in n["children"]:
-            params[child["id"]] = evaluate(child)
-
-        # Validate that all placeholders have corresponding parameters
-        _validate_entity_params(n["prompt"], params, n["id"])
-
-        # Insert evaluated children into this prompt
-        result = insert_params_into_prompt(n["prompt"], params)
-        evaluated[n["id"]] = result
-        return result
-
-    return evaluate(node)
-
-
-def _validate_entity_params(
-    prompt: str,
-    params: SimpleParams,
-    node_id: str,
-) -> None:
-    """
-    Validates that all placeholders in a prompt have corresponding parameter values.
-
-    Args:
-        prompt: The prompt template to validate
-        params: The available parameters
-        node_id: The node ID for error messaging
-
-    Raises:
-        ValueError: if any placeholders don't have corresponding parameters
-    """
-    # Extract all placeholders from the prompt
-    placeholder_regex = re.compile(r"\{\{(\w+)\}\}")
-    matches = placeholder_regex.findall(prompt)
-    missing_params: List[str] = []
-
-    for param_name in matches:
-        if param_name not in params:
-            missing_params.append(param_name)
-
-    if missing_params:
-        # Remove duplicates, preserve order
-        unique_missing = list(dict.fromkeys(missing_params))
-        plural = "s" if len(unique_missing) > 1 else ""
-        raise ValueError(
-            f'Missing parameter{plural} in entity "{node_id}": {", ".join(unique_missing)}'
-        )
-
-
-def insert_params_into_prompt(
-    prompt: str,
-    params: Optional[SimpleParams] = None,
-) -> str:
-    """
-    Inserts parameters into a prompt template.
-
-    Args:
-        prompt: The prompt template containing placeholders in the form {{variableName}}.
-        params: An object mapping variable names to their replacement values.
-
-    Returns:
-        The prompt with all placeholders replaced by their corresponding values.
-    """
-    if params is None:
-        return prompt
-
-    result = prompt
-    for key, value in params.items():
-        # Use re.sub with escaped key for safety, but key should only be word chars
-        result = re.sub(r"\{\{" + re.escape(key) + r"\}\}", value, result)
-    return result
-
-
-def traverse_entity_node(
-    node: EntityNode,
-    callback: Callable[[EntityNode, Optional[str]], None],
-    parent_id: Optional[str] = None,
-) -> None:
-    """
-    Traverses an EntityNode tree and applies a callback to each node.
-
-    Args:
-        node: The root node to start traversal from
-        callback: Function called for each node with (node, parent_id)
-        parent_id: The ID of the parent node (None for root)
-    """
-    callback(node, parent_id)
-    for child in node["children"]:
-        traverse_entity_node(child, callback, node["id"])
-
-
-def traverse_agent_node(
-    node: EntityNode,
-    callback: Callable[[EntityNode, Optional[str]], None],
-    parent_id: Optional[str] = None,
-) -> None:
-    """
-    Traverses an EntityNode tree and applies a callback to each node.
-    Alias for traverse_entity_node for backwards compatibility.
-    """
-    traverse_entity_node(node, callback, parent_id)
-
-
-def format_entity_request(node: EntityNode) -> EntityRequest:
-    """
-    Formats an EntityNode into an EntityRequest suitable for the /sync_entities API.
+    Formats an EntityNode into an EntityV2Request suitable for the /api/v2/entities API.
+    V2 uses nested structure with param values (not just keys).
 
     Args:
         node: The root EntityNode to format
 
     Returns:
-        The formatted EntityRequest
+        The formatted EntityV2Request
     """
-    def format_node(n: EntityNode) -> EntityRequestItem:
-        param_keys = list(n["params"].keys()) + [child["id"] for child in n["children"]]
-        item: EntityRequestItem = {
+    from .types import EntityV2Request, EntityV2RequestData
+
+    def format_node(n: EntityNode) -> EntityV2Request:
+        # Build params: string values + recursively formatted children
+        params: Dict[str, Any] = {}
+
+        # Add string params
+        for key, value in n["params"].items():
+            params[key] = value
+
+        # Add children as nested entities
+        for child in n["children"]:
+            params[child["id"]] = format_node(child)
+
+        request: EntityV2Request = {
             "id": n["id"],
             "type": n.get("type", "agent"),
-            "name": n.get("name"),
-            "majorVersion": n.get("major_version"),
             "prompt": n["prompt"],
-            "paramKeys": param_keys,
-            "childrenIds": [child["id"] for child in n["children"]],
-            "childrenTypes": [child.get("type", "prompt") for child in n["children"]],
+            "majorVersion": n.get("major_version"),
+            "name": n.get("name"),
         }
 
-        # Add hyperparameters for agents
+        if params:
+            request["params"] = params
+
+        # Add data for agents (hyperparameters)
         if n.get("type") == "agent":
-            item["model"] = n.get("model")
-            item["provider"] = n.get("provider")
-            item["temperature"] = n.get("temperature")
-            item["maxTokens"] = n.get("max_tokens")
-            item["topP"] = n.get("top_p")
-            item["frequencyPenalty"] = n.get("frequency_penalty")
-            item["presencePenalty"] = n.get("presence_penalty")
-            item["stopSequences"] = n.get("stop_sequences")
-            item["tools"] = n.get("tools")
+            request["data"] = {
+                "model": n.get("model"),
+                "provider": n.get("provider"),
+                "temperature": n.get("temperature"),
+                "maxTokens": n.get("max_tokens"),
+                "topP": n.get("top_p"),
+                "frequencyPenalty": n.get("frequency_penalty"),
+                "presencePenalty": n.get("presence_penalty"),
+                "stopSequences": n.get("stop_sequences"),
+                "tools": n.get("tools"),
+            }
 
-        return item
+        return request
 
-    entity_map: Dict[str, EntityRequestItem] = {}
-
-    def add_to_map(current_node: EntityNode, parent_id: Optional[str]) -> None:
-        entity_map[current_node["id"]] = format_node(current_node)
-
-    traverse_entity_node(node, add_to_map)
-
-    return {
-        "entities": {
-            "rootId": node["id"],
-            "rootType": node.get("type", "agent"),
-            "map": entity_map,
-        }
-    }
-
-
+    return format_node(node)
 
 
 def update_entity_nodes(
