@@ -64,7 +64,7 @@ class Hone:
         self,
         endpoint: str,
         method: str = "GET",
-        body: Optional[Dict[str, Any]] = None,
+        body: Any = None,
     ) -> Any:
         """
         Make an HTTP request to the Hone API.
@@ -136,7 +136,7 @@ class Hone:
         # Include extra data in the request
         extra_data = options.get("extra")
         if extra_data and request.get("data"):
-            request["data"].update(extra_data)
+            request["data"].update(extra_data)  # type: ignore[typeddict-item]
 
         # Call evaluate endpoint - server handles evaluation
         response: EntityV2Response = await self._make_request(
@@ -167,7 +167,7 @@ class Hone:
                      "frequencyPenalty", "presencePenalty", "stopSequences", "tools"}
         extra_from_response = {k: v for k, v in data.items() if k not in known_keys}
         if extra_from_response:
-            result.update(extra_from_response)
+            result.update(extra_from_response)  # type: ignore[typeddict-item]
 
         return result
 

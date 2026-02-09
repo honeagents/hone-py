@@ -8,7 +8,7 @@ Exact replica of TypeScript tools.ts.
 """
 
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Literal
 
 from .types import Message, ToolCall
 
@@ -453,7 +453,7 @@ def normalize_gemini_contents(contents: List[Dict[str, Any]]) -> List[Message]:
                 })
 
         # Map Gemini's "model" role to "assistant"
-        mapped_role = "assistant" if role == "model" else "user"
+        mapped_role: Literal["user", "assistant"] = "assistant" if role == "model" else "user"
 
         if text_parts or tool_calls:
             message: Message = {

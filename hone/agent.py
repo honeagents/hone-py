@@ -4,7 +4,7 @@ Agent and Entity utilities for the Hone SDK.
 Handles entity tree building and formatting for the evaluate API.
 """
 
-from typing import Callable, Dict, List, Optional, Set, Any, Union
+from typing import Callable, Dict, List, Optional, Set, Any, Union, cast
 
 from .types import (
     GetAgentOptions,
@@ -155,7 +155,7 @@ def _get_entity_node(
 
     # Add hyperparameters for agents
     if entity_type == "agent":
-        agent_options = options  # type: GetAgentOptions
+        agent_options = cast(GetAgentOptions, options)
         node["model"] = agent_options.get("model")
         node["provider"] = agent_options.get("provider")
         node["temperature"] = agent_options.get("temperature")
