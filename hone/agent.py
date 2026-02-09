@@ -13,6 +13,7 @@ from .types import (
     EntityNode,
     SimpleParams,
     EntityType,
+    EntityV2Request,
 )
 
 # Type alias for the combined entity node type
@@ -168,7 +169,7 @@ def _get_entity_node(
     return node
 
 
-def format_entity_v2_request(node: EntityNode) -> "EntityV2Request":
+def format_entity_v2_request(node: EntityNode) -> EntityV2Request:
     """
     Formats an EntityNode into an EntityV2Request suitable for the /api/evaluate API.
     Uses nested structure with param values (not just keys).
@@ -179,7 +180,6 @@ def format_entity_v2_request(node: EntityNode) -> "EntityV2Request":
     Returns:
         The formatted EntityV2Request
     """
-    from .types import EntityV2Request, EntityV2RequestData
 
     def format_node(n: EntityNode) -> EntityV2Request:
         # Build params: string values + recursively formatted children
