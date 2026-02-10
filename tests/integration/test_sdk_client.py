@@ -477,8 +477,8 @@ class TestErrorHandling:
         prompt_id = unique_prompt_id("missing")
 
         # When using a template with a placeholder but not providing the param,
-        # the SDK should throw an error during evaluation
-        with pytest.raises(ValueError, match="Missing parameter"):
+        # the server detects the missing parameter and returns a 400 error
+        with pytest.raises(Exception, match="Missing parameter"):
             await client.prompt(prompt_id, {
                 "default_prompt": "Hello {{missingParam}}!",
                 # No params provided
