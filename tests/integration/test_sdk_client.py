@@ -107,10 +107,10 @@ class TestHonePromptMethod:
         assert prompt.name == prompt_id
 
     @pytest.mark.asyncio
-    async def test_should_use_fallback_when_api_call_fails(
+    async def test_should_throw_error_when_api_call_fails(
         self, fixture: TestFixture, clean_project
     ):
-        """Should use fallback when API call fails."""
+        """Should throw error when API call fails with invalid key."""
         # Create client with invalid API key
         bad_client = Hone({
             "api_key": "invalid_key",
@@ -118,15 +118,14 @@ class TestHonePromptMethod:
         })
         prompt_id = unique_prompt_id("fallback")
 
-        # Should use fallback prompt instead of throwing
-        result = await bad_client.prompt(prompt_id, {
-            "default_prompt": "Fallback: {{name}}",
-            "params": {
-                "name": "User",
-            },
-        })
-
-        assert result == "Fallback: User"
+        # Should throw error when API key is invalid
+        with pytest.raises(Exception, match=r"Hone API error"):
+            await bad_client.prompt(prompt_id, {
+                "default_prompt": "Fallback: {{name}}",
+                "params": {
+                    "name": "User",
+                },
+            })
 
     @pytest.mark.asyncio
     async def test_should_handle_prompt_without_parameters(
@@ -447,10 +446,10 @@ class TestErrorHandling:
     """Tests for error handling."""
 
     @pytest.mark.asyncio
-    async def test_should_gracefully_handle_network_errors(
+    async def test_should_throw_error_on_network_failures(
         self, fixture: TestFixture, clean_project
     ):
-        """Should gracefully handle network errors."""
+        """Should throw error on network failures."""
         # Create client with unreachable URL
         bad_client = Hone({
             "api_key": fixture.project.api_key,
@@ -459,12 +458,11 @@ class TestErrorHandling:
         })
         prompt_id = unique_prompt_id("network")
 
-        # Should fall back to default prompt
-        result = await bad_client.prompt(prompt_id, {
-            "default_prompt": "Fallback prompt",
-        })
-
-        assert result == "Fallback prompt"
+        # Should throw error when network is unreachable
+        with pytest.raises(Exception):
+            await bad_client.prompt(prompt_id, {
+                "default_prompt": "Fallback prompt",
+            })
 
     @pytest.mark.asyncio
     async def test_should_throw_for_missing_required_parameters(
