@@ -15,8 +15,9 @@ from .helpers import (
     unique_prompt_id,
 )
 
-# Point the SDK to local Supabase
-SUPABASE_RPC_URL = "http://127.0.0.1:54321/rest/v1/rpc"
+# Point the SDK to local Next.js API
+import os
+API_BASE_URL = os.environ.get("HONE_API_URL", "http://localhost:3000/api")
 
 
 class TestHonePromptMethod:
@@ -29,7 +30,7 @@ class TestHonePromptMethod:
         """Should create prompt and return evaluated result."""
         client = Hone({
             "api_key": fixture.project.api_key,
-            "base_url": SUPABASE_RPC_URL,
+            "base_url": API_BASE_URL,
         })
         prompt_id = unique_prompt_id("basic")
 
@@ -55,7 +56,7 @@ class TestHonePromptMethod:
         """Should return the updated prompt text from the database."""
         client = Hone({
             "api_key": fixture.project.api_key,
-            "base_url": SUPABASE_RPC_URL,
+            "base_url": API_BASE_URL,
         })
         prompt_id = unique_prompt_id("update-text")
 
@@ -72,7 +73,7 @@ class TestHonePromptMethod:
 
         # Directly update the prompt text in database (simulating UI change)
         await db.patch(
-            "prompts",
+            "versioned_entities",
             {"text": "{{name}}'s UPDATED prompt"},
             {"project_id": fixture.project.id, "id": prompt_id},
         )
@@ -93,7 +94,7 @@ class TestHonePromptMethod:
         """Should default name to prompt id when name is not provided."""
         client = Hone({
             "api_key": fixture.project.api_key,
-            "base_url": SUPABASE_RPC_URL,
+            "base_url": API_BASE_URL,
         })
         prompt_id = unique_prompt_id("noname")
 
@@ -114,7 +115,7 @@ class TestHonePromptMethod:
         # Create client with invalid API key
         bad_client = Hone({
             "api_key": "invalid_key",
-            "base_url": SUPABASE_RPC_URL,
+            "base_url": API_BASE_URL,
         })
         prompt_id = unique_prompt_id("fallback")
 
@@ -134,7 +135,7 @@ class TestHonePromptMethod:
         """Should handle prompt without parameters."""
         client = Hone({
             "api_key": fixture.project.api_key,
-            "base_url": SUPABASE_RPC_URL,
+            "base_url": API_BASE_URL,
         })
         prompt_id = unique_prompt_id("noparam")
 
@@ -151,12 +152,12 @@ class TestHonePromptMethod:
         """Should handle prompt with version and name."""
         client = Hone({
             "api_key": fixture.project.api_key,
-            "base_url": SUPABASE_RPC_URL,
+            "base_url": API_BASE_URL,
         })
         prompt_id = unique_prompt_id("versioned")
 
         result = await client.prompt(prompt_id, {
-            "version": "2.0.0",
+            "major_version": 2,
             "name": "My Named Prompt",
             "default_prompt": "Hello, {{user}}!",
             "params": {"user": "Developer"},
@@ -167,7 +168,7 @@ class TestHonePromptMethod:
         # Verify metadata was stored
         prompt = await db.get_prompt(fixture.project.id, prompt_id)
         assert prompt is not None
-        assert prompt.version == "2.0.0"
+        assert prompt.version == 2
         assert prompt.name == "My Named Prompt"
 
 
@@ -181,7 +182,7 @@ class TestNestedPrompts:
         """Should handle nested prompt calls."""
         client = Hone({
             "api_key": fixture.project.api_key,
-            "base_url": SUPABASE_RPC_URL,
+            "base_url": API_BASE_URL,
         })
         main_id = unique_prompt_id("main")
         intro_id = "intro"
@@ -198,7 +199,7 @@ class TestNestedPrompts:
 
         assert result == "Welcome! Hello, Nested User!"
 
-        # Verify both prompts were created
+        # Verify both versioned_entities were created
         main_prompt = await db.get_prompt(fixture.project.id, main_id)
         intro_prompt = await db.get_prompt(fixture.project.id, intro_id)
 
@@ -215,15 +216,15 @@ class TestNestedPrompts:
     async def test_should_return_updated_nested_prompt_text(
         self, db: TestDatabase, fixture: TestFixture, clean_project
     ):
-        """Should return the updated prompt text from the database for nested prompts."""
+        """Should return the updated prompt text from the database for nested versioned_entities."""
         client = Hone({
             "api_key": fixture.project.api_key,
-            "base_url": SUPABASE_RPC_URL,
+            "base_url": API_BASE_URL,
         })
         parent_id = unique_prompt_id("parent")
         child_id = "child"
 
-        # First call creates both prompts
+        # First call creates both versioned_entities
         await client.prompt(parent_id, {
             "default_prompt": "Parent says: {{child}}",
             "params": {
@@ -235,7 +236,7 @@ class TestNestedPrompts:
 
         # Update child prompt text directly in database
         await db.patch(
-            "prompts",
+            "versioned_entities",
             {"text": "Child v2"},
             {"project_id": fixture.project.id, "id": child_id},
         )
@@ -253,13 +254,13 @@ class TestNestedPrompts:
         assert result == "Parent says: Child v2"
 
     @pytest.mark.asyncio
-    async def test_should_handle_deeply_nested_prompts(
+    async def test_should_handle_deeply_nested_versioned_entities(
         self, db: TestDatabase, fixture: TestFixture, clean_project
     ):
-        """Should handle deeply nested prompts."""
+        """Should handle deeply nested versioned_entities."""
         client = Hone({
             "api_key": fixture.project.api_key,
-            "base_url": SUPABASE_RPC_URL,
+            "base_url": API_BASE_URL,
         })
         l0_id = unique_prompt_id("l0")
         l1_key = "l1"
@@ -292,7 +293,7 @@ class TestNestedPrompts:
         """Should handle mixed nested and string params."""
         client = Hone({
             "api_key": fixture.project.api_key,
-            "base_url": SUPABASE_RPC_URL,
+            "base_url": API_BASE_URL,
         })
         root_id = unique_prompt_id("mixroot")
         greeting_key = "greeting"
@@ -321,7 +322,7 @@ class TestParameterSubstitution:
         """Should substitute multiple occurrences of same param."""
         client = Hone({
             "api_key": fixture.project.api_key,
-            "base_url": SUPABASE_RPC_URL,
+            "base_url": API_BASE_URL,
         })
         prompt_id = unique_prompt_id("multi")
 
@@ -339,7 +340,7 @@ class TestParameterSubstitution:
         """Should handle params with special regex characters."""
         client = Hone({
             "api_key": fixture.project.api_key,
-            "base_url": SUPABASE_RPC_URL,
+            "base_url": API_BASE_URL,
         })
         prompt_id = unique_prompt_id("regex")
 
@@ -357,7 +358,7 @@ class TestParameterSubstitution:
         """Should preserve param order."""
         client = Hone({
             "api_key": fixture.project.api_key,
-            "base_url": SUPABASE_RPC_URL,
+            "base_url": API_BASE_URL,
         })
         prompt_id = unique_prompt_id("order")
 
@@ -373,19 +374,19 @@ class TestRemoteUpdates:
     """Tests for remote prompt updates."""
 
     @pytest.mark.asyncio
-    async def test_should_use_updated_prompt_when_version_changes(
+    async def test_should_use_updated_prompt_when_major_version_changes(
         self, db: TestDatabase, fixture: TestFixture, clean_project
     ):
-        """Should use updated prompt when version changes."""
+        """Should use updated prompt when major_version changes."""
         client = Hone({
             "api_key": fixture.project.api_key,
-            "base_url": SUPABASE_RPC_URL,
+            "base_url": API_BASE_URL,
         })
         prompt_id = unique_prompt_id("update")
 
         # First call with v1
         result = await client.prompt(prompt_id, {
-            "version": "1.0",
+            "major_version": 1,
             "default_prompt": "Version 1: {{name}}",
             "params": {"name": "Test"},
         })
@@ -393,7 +394,7 @@ class TestRemoteUpdates:
 
         # Second call with v2 - should update
         result = await client.prompt(prompt_id, {
-            "version": "2.0",
+            "major_version": 2,
             "default_prompt": "Version 2: {{name}}",
             "params": {"name": "Test"},
         })
@@ -402,23 +403,23 @@ class TestRemoteUpdates:
         # Verify database has v2
         prompt = await db.get_prompt(fixture.project.id, prompt_id)
         assert prompt is not None
-        assert prompt.version == "2.0"
+        assert prompt.version == 2
         assert prompt.text == "Version 2: {{name}}"
 
     @pytest.mark.asyncio
-    async def test_should_not_update_database_when_version_unchanged(
+    async def test_should_not_update_database_when_major_version_unchanged(
         self, db: TestDatabase, fixture: TestFixture, clean_project
     ):
-        """Should not update database when version unchanged."""
+        """Should not update database when major_version unchanged."""
         client = Hone({
             "api_key": fixture.project.api_key,
-            "base_url": SUPABASE_RPC_URL,
+            "base_url": API_BASE_URL,
         })
         prompt_id = unique_prompt_id("cached")
 
         # First call
         await client.prompt(prompt_id, {
-            "version": "1.0",
+            "major_version": 1,
             "default_prompt": "Original prompt",
         })
 
@@ -427,9 +428,9 @@ class TestRemoteUpdates:
         assert prompt is not None
         assert prompt.text == "Original prompt"
 
-        # Second call with same version but different default
+        # Second call with same major_version but different default
         result = await client.prompt(prompt_id, {
-            "version": "1.0",
+            "major_version": 1,
             "default_prompt": "Different default (should not save)",
         })
 
@@ -471,7 +472,7 @@ class TestErrorHandling:
         """Should throw for missing required parameters."""
         client = Hone({
             "api_key": fixture.project.api_key,
-            "base_url": SUPABASE_RPC_URL,
+            "base_url": API_BASE_URL,
         })
         prompt_id = unique_prompt_id("missing")
 

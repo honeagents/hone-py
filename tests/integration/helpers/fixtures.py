@@ -33,6 +33,9 @@ async def create_test_fixture(
         f"test-org-{unique_id}",
     )
 
+    # Create subscription for billing limits
+    await db.create_test_subscription(org_id)
+
     project = await db.create_project(
         project_id,
         f"Test Project {unique_id}",

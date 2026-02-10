@@ -8,7 +8,9 @@ Exact replica of TypeScript database.ts - provides direct database access for:
 """
 
 import os
+import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, TypedDict
 
 import httpx
@@ -229,6 +231,7 @@ class TestDatabase:
             "id": id,
             "name": name,
             "slug": slug,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         })
         return TestOrganization(
             id=result["id"],
@@ -249,6 +252,7 @@ class TestDatabase:
             "name": name,
             "organization_id": organization_id,
             "api_key": api_key,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         })
         return TestProject(
             id=result["id"],
@@ -257,10 +261,23 @@ class TestDatabase:
             organization_id=result["organization_id"],
         )
 
+    async def create_test_subscription(self, organization_id: str) -> None:
+        """Create a subscription for an organization with high limits for testing."""
+        await self._insert("subscriptions", {
+            "id": str(uuid.uuid4()),
+            "organization_id": organization_id,
+            "plan": "team",  # Team plan has high limits (100 agents, 50000 tracked calls)
+            "status": "active",
+            "tracked_calls_this_month": 0,
+            "sandbox_runs_this_month": 0,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        })
+
     async def get_prompts(self, project_id: str) -> List[Prompt]:
         """Get all prompts for a project."""
-        results = await self._query("prompts", {
+        results = await self._query("versioned_entities", {
             "project_id": f"eq.{project_id}",
+            "type": "eq.prompt",
         })
 
         return [
@@ -268,7 +285,7 @@ class TestDatabase:
                 id=r["id"],
                 project_id=r["project_id"],
                 name=r.get("name"),
-                version=r.get("version"),
+                version=r.get("major_version"),
                 param_keys=r.get("param_keys", []),
                 text=r["text"],
             )
@@ -281,8 +298,9 @@ class TestDatabase:
         prompt_id: str,
     ) -> Optional[Prompt]:
         """Get a specific prompt by ID."""
-        results = await self._query("prompts", {
+        results = await self._query("versioned_entities", {
             "project_id": f"eq.{project_id}",
+            "type": "eq.prompt",
             "id": f"eq.{prompt_id}",
         })
 
@@ -294,7 +312,7 @@ class TestDatabase:
             id=r["id"],
             project_id=r["project_id"],
             name=r.get("name"),
-            version=r.get("version"),
+            version=r.get("major_version"),
             param_keys=r.get("param_keys", []),
             text=r["text"],
         )
@@ -305,9 +323,9 @@ class TestDatabase:
         prompt_id: str,
         new_text: str,
     ) -> None:
-        """Updates a prompt's text directly in the database."""
+        """Updates an entity's text directly in the database."""
         await self.patch(
-            "prompts",
+            "versioned_entities",
             {"text": new_text},
             {
                 "project_id": project_id,
@@ -316,8 +334,8 @@ class TestDatabase:
         )
 
     async def get_hierarchy(self, project_id: str) -> List[PromptHierarchy]:
-        """Get all prompt hierarchy entries for a project."""
-        results = await self._query("prompt_hierarchy", {
+        """Get all entity hierarchy entries for a project."""
+        results = await self._query("entity_hierarchy", {
             "project_id": f"eq.{project_id}",
         })
 
@@ -325,8 +343,8 @@ class TestDatabase:
             PromptHierarchy(
                 id=r["id"],
                 project_id=r["project_id"],
-                parent_prompt_id=r["parent_prompt_id"],
-                child_prompt_id=r["child_prompt_id"],
+                parent_prompt_id=r["parent_entity_id"],
+                child_prompt_id=r["child_entity_id"],
             )
             for r in results
         ]
@@ -437,17 +455,21 @@ class TestDatabase:
         )
 
     async def cleanup_project(self, project_id: str) -> None:
-        """Delete all prompts, hierarchy, runs, and sessions for a project."""
+        """Delete all entities, hierarchy, runs, and sessions for a project."""
         # Delete sessions first (foreign key to runs)
         await self._delete("sessions", {"project_id": f"eq.{project_id}"})
-        # Delete runs (foreign key to prompts)
+        # Delete detected tools (foreign key to entities)
+        await self._delete("detected_tools", {"project_id": f"eq.{project_id}"})
+        # Delete runs (foreign key to entities)
         await self._delete("runs", {"project_id": f"eq.{project_id}"})
-        # Delete hierarchy (foreign key to prompts)
-        await self._delete("prompt_hierarchy", {"project_id": f"eq.{project_id}"})
-        # Delete archived prompts
-        await self._delete("archived_prompts", {"project_id": f"eq.{project_id}"})
-        # Delete prompts
-        await self._delete("prompts", {"project_id": f"eq.{project_id}"})
+        # Delete hierarchy (foreign key to entities)
+        await self._delete("entity_hierarchy", {"project_id": f"eq.{project_id}"})
+        # Delete archived entities
+        await self._delete("archived_entities", {"project_id": f"eq.{project_id}"})
+        # Delete staged entities
+        await self._delete("staged_entities", {"project_id": f"eq.{project_id}"})
+        # Delete versioned entities
+        await self._delete("versioned_entities", {"project_id": f"eq.{project_id}"})
 
     async def delete_project(self, project_id: str) -> None:
         """Delete a project and its organization."""
@@ -455,7 +477,9 @@ class TestDatabase:
         await self._delete("projects", {"id": f"eq.{project_id}"})
 
     async def delete_organization(self, organization_id: str) -> None:
-        """Delete an organization."""
+        """Delete an organization and its subscription."""
+        # Delete subscription first (foreign key to organization)
+        await self._delete("subscriptions", {"organization_id": f"eq.{organization_id}"})
         await self._delete("organizations", {"id": f"eq.{organization_id}"})
 
     async def close(self) -> None:
